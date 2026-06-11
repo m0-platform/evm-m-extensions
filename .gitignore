@@ -11,8 +11,9 @@ out/
 coverage/
 lcov.info
 
-# Docs
-docs/
+# Docs (generated `forge doc` output and drafts; docs/audit/ is hand-written and tracked)
+docs/*
+!docs/audit/
 
 # Dotenv file
 .env
