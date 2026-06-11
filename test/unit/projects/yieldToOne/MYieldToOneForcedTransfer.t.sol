@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.26;
 
+import { Vm } from "../../../../lib/forge-std/src/Vm.sol";
+
 import { IERC20 } from "../../../../lib/common/src/interfaces/IERC20.sol";
 
 import { IAccessControl } from "../../../../lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
@@ -184,6 +186,77 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         }
     }
 
+    function test_forceTransfer_registeredRecipient_emitsPlaintextOnly() public {
+        uint256 amount = 1_000e6;
+        mYieldToOneForcedTransfer.setBalanceOf(alice, amount);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOneForcedTransfer.registerPublicKey(_validPubKey(0xBB));
+
+        vm.prank(freezeManager);
+        mYieldToOneForcedTransfer.freeze(alice);
+
+        assertEq(mYieldToOneForcedTransfer.getEncryptedEventNonce(), 0);
+
+        vm.recordLogs();
+
+        vm.prank(forcedTransferManager);
+        mYieldToOneForcedTransfer.forceTransfer(alice, bob, amount);
+
+        assertEq(mYieldToOneForcedTransfer.getEncryptedEventNonce(), 0);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
+        bytes32 forcedTopic = keccak256("ForcedTransfer(address,address,address,uint256)");
+
+        bool foundBytes;
+        bool foundPlaintext;
+        bool foundForced;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(mYieldToOneForcedTransfer)) continue;
+            if (logs[i].topics.length == 0) continue;
+
+            if (logs[i].topics[0] == bytesTopic) {
+                foundBytes = true;
+            } else if (logs[i].topics[0] == plaintextTopic) {
+                foundPlaintext = true;
+                assertEq(address(uint160(uint256(logs[i].topics[1]))), alice);
+                assertEq(address(uint160(uint256(logs[i].topics[2]))), bob);
+                assertEq(abi.decode(logs[i].data, (uint256)), amount);
+            } else if (logs[i].topics[0] == forcedTopic) {
+                foundForced = true;
+            }
+        }
+
+        assertTrue(foundPlaintext, "missing plaintext Transfer(uint256) emit on forceTransfer");
+        assertTrue(foundForced, "missing ForcedTransfer emit");
+        assertFalse(foundBytes, "forceTransfer leaked into encrypted-bytes Transfer overload");
+
+        assertEq(mYieldToOneForcedTransfer.getBalanceOf(alice), 0);
+        assertEq(mYieldToOneForcedTransfer.getBalanceOf(bob), amount);
+    }
+
+    function test_forceTransfer_worksWhilePaused() public {
+        uint256 amount = 1_000e6;
+        mYieldToOneForcedTransfer.setBalanceOf(alice, amount);
+
+        vm.prank(freezeManager);
+        mYieldToOneForcedTransfer.freeze(alice);
+
+        vm.prank(pauser);
+        mYieldToOneForcedTransfer.pause();
+
+        vm.prank(forcedTransferManager);
+        mYieldToOneForcedTransfer.forceTransfer(alice, bob, amount);
+
+        assertEq(mYieldToOneForcedTransfer.getBalanceOf(alice), 0);
+        assertEq(mYieldToOneForcedTransfer.getBalanceOf(bob), amount);
+    }
+
     /* ============ forceTransfers ============ */
 
     function test_forceTransfers_succeedsForManager() public {
@@ -348,12 +421,9 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         }
     }
 
-    /* ============ inherited native infra paths ============ */
+    /* ============ transferFrom (native) ============ */
 
     function test_nativeTransferFrom_allowlistedCaller() public {
-        // The FT subclass does not override the native, allowlist-gated `approve` / `transferFrom`
-        // paths, so it inherits them from MYieldToOne. An allowlisted caller can drive a native
-        // `transferFrom(uint256)` against the shared shielded allowance slot.
         uint256 amount = 1_000e6;
         mYieldToOneForcedTransfer.setBalanceOf(alice, amount);
 
@@ -387,6 +457,8 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         mYieldToOneForcedTransfer.transferFrom(alice, bob, amount);
     }
 
+    /* ============ balanceOf ============ */
+
     function test_balanceOf_allowlistedInfraCanReadAnyHolder() public {
         mYieldToOneForcedTransfer.setBalanceOf(alice, 1_000e6);
 
@@ -397,7 +469,12 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         assertEq(mYieldToOneForcedTransfer.balanceOf(alice), 1_000e6);
     }
 
-    /* ============ balanceOf (gated read) ============ */
+    function test_balanceOf_holderCanRead() public {
+        mYieldToOneForcedTransfer.setBalanceOf(alice, 1_000e6);
+
+        vm.prank(alice);
+        assertEq(mYieldToOneForcedTransfer.balanceOf(alice), 1_000e6);
+    }
 
     function test_balanceOf_freezeManagerCanRead() public {
         mYieldToOneForcedTransfer.setBalanceOf(alice, 1_000e6);
@@ -440,6 +517,94 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
 
         vm.prank(forcedTransferManager);
         assertEq(mYieldToOneForcedTransfer.balanceOf(bob), seized);
+    }
+
+    /* ============ Helpers ============ */
+
+    function _validPubKey(bytes1 marker) internal pure returns (bytes memory) {
+        bytes memory key = new bytes(33);
+        key[0] = 0x02;
+        for (uint256 i = 1; i < 33; ++i) {
+            key[i] = marker;
+        }
+        return key;
+    }
+
+    function _mockPrecompiles() internal {
+        vm.mockCall(address(0x65), bytes(""), abi.encode(bytes32(uint256(1))));
+        vm.mockCall(address(0x68), bytes(""), abi.encode(bytes32(uint256(2))));
+        vm.mockCall(address(0x66), bytes(""), hex"deadbeefcafebabe");
+    }
+
+    function _installContractKey() internal {
+        vm.prank(admin);
+        mYieldToOneForcedTransfer.setContractKey(sbytes32(bytes32(uint256(0xC0FFEE))), _validPubKey(0xAA));
+    }
+
+    /* ============ transfer / transferFrom / approve (shielded) ============ */
+
+    function test_transfer_shieldedOverload() external {
+        uint256 amount = 1_000e6;
+        mYieldToOneForcedTransfer.setBalanceOf(alice, amount);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOneForcedTransfer.registerPublicKey(_validPubKey(0xBB));
+
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+
+        vm.prank(alice);
+        mYieldToOneForcedTransfer.transfer(bob, suint256(amount));
+
+        assertEq(mYieldToOneForcedTransfer.getEncryptedEventNonce(), 1);
+        assertEq(mYieldToOneForcedTransfer.getBalanceOf(alice), 0);
+        assertEq(mYieldToOneForcedTransfer.getBalanceOf(bob), amount);
+    }
+
+    function test_transferFrom_shieldedOverload() external {
+        uint256 amount = 1_000e6;
+        mYieldToOneForcedTransfer.setBalanceOf(alice, amount);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOneForcedTransfer.registerPublicKey(_validPubKey(0xBB));
+
+        vm.prank(alice);
+        mYieldToOneForcedTransfer.approve(carol, suint256(amount));
+
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+
+        vm.prank(carol);
+        mYieldToOneForcedTransfer.transferFrom(alice, bob, suint256(amount));
+
+        assertEq(mYieldToOneForcedTransfer.getBalanceOf(alice), 0);
+        assertEq(mYieldToOneForcedTransfer.getBalanceOf(bob), amount);
+        assertEq(mYieldToOneForcedTransfer.getShieldedAllowance(alice, carol), 0);
+    }
+
+    function test_approve_shieldedOverload() external {
+        uint256 amount = 1_000e6;
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOneForcedTransfer.registerPublicKey(_validPubKey(0xBB));
+
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Approval(alice, bob, hex"deadbeefcafebabe");
+
+        vm.prank(alice);
+        mYieldToOneForcedTransfer.approve(bob, suint256(amount));
+
+        assertEq(mYieldToOneForcedTransfer.getEncryptedEventNonce(), 1);
+        assertEq(mYieldToOneForcedTransfer.getShieldedAllowance(alice, bob), amount);
     }
 
     /* ============ claimYield ============ */
