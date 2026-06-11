@@ -23,14 +23,15 @@ abstract contract MYieldToOneStorageLayout {
         mapping(address account => mapping(address spender => suint256 allowance)) shieldedAllowance;
         // Admin-curated trusted M0 infra; gates the native approve/transferFrom paths and balanceOf reads.
         mapping(address account => bool isAllowlisted) allowlist;
-        // Encrypted Transfer events: per-recipient public-key registry. An unset key triggers the
-        // empty-ciphertext fallback emit; the recipient still recovers the amount via its gated balanceOf.
+        // Encrypted Transfer/Approval events: per-account public-key registry. An unset key triggers
+        // the empty-ciphertext fallback emit; the account still recovers the amount via its gated reads.
         mapping(address account => bytes publicKey) publicKeys;
         // Contract public key (plain bytes); off-chain decryption clients ECDH against this.
         bytes _contractPublicKey;
         // Contract private key (shielded ECDH input); set once via `setContractKey` (MUST be sent as TxSeismic 0x4A).
         sbytes32 contractPrivateKey;
-        // Monotonic counter feeding the per-emit AES-GCM nonce; pre-incremented so nonces never repeat under one key.
+        // Monotonic counter feeding the per-emit AES-GCM nonce, shared by encrypted Transfer and
+        // Approval emits; pre-incremented so nonces never repeat under one key.
         uint256 encryptedEventNonce;
     }
 
@@ -206,7 +207,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
 
     /// @inheritdoc IMYieldToOne
     function approve(address spender, suint256 amount) external returns (bool) {
-        _shieldedApprove(msg.sender, spender, amount);
+        // User path: encrypted-bytes emit.
+        _shieldedApprove(msg.sender, spender, amount, true);
         return true;
     }
 
@@ -251,7 +253,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
     ) external override(ERC20ExtendedUpgradeable, IERC20) returns (bool) {
         if (!_isInfra(spender)) revert UseShieldedApprove();
 
-        _shieldedApprove(msg.sender, spender, suint256(amount));
+        // Infra path: amount already public via plain calldata, so emit the plaintext Approval.
+        _shieldedApprove(msg.sender, spender, suint256(amount), false);
         return true;
     }
 
@@ -484,7 +487,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         _beforeTransfer(sender, recipient, amount_);
 
         if (encryptEmit) {
-            _emitEncryptedTransfer(sender, recipient, amount);
+            emit Transfer(sender, recipient, _encryptAmount(sender, recipient, amount));
         } else {
             emit Transfer(sender, recipient, amount_);
         }
@@ -498,22 +501,22 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         _update(sender, recipient, amount_);
     }
 
-    /* ============ Encrypted Transfer Event Pipeline ============ */
+    /* ============ Encrypted Event Pipeline ============ */
 
     /**
-     * @dev   Emits the encrypted-bytes Transfer for a user-to-user shielded transfer; amount is
-     *        AES-GCM-encrypted under HKDF(ECDH(contractPrivKey, recipientPubKey)). Unregistered
-     *        recipient => empty-ciphertext fallback (transfer still succeeds; amount only via gated
-     *        balanceOf). Reverts `ContractKeyNotSet` if the keypair is not installed. Nonce: see slot 8.
+     * @dev    Encrypts `amount` to `to`'s registered key for an encrypted-bytes event payload;
+     *         AES-GCM under HKDF(ECDH(contractPrivKey, toPubKey)), nonce from the shared monotonic
+     *         counter. Reverts `ContractKeyNotSet` if the keypair is not installed.
+     * @param  from   The counterparty address bound into the nonce derivation (sender / approver).
+     * @param  to     The account whose registered key the ciphertext is encrypted to.
+     * @param  amount The shielded amount to encrypt.
+     * @return The AES-GCM ciphertext, or empty bytes if `to` has not registered a key.
      */
-    function _emitEncryptedTransfer(address from, address to, suint256 amount) internal {
+    function _encryptAmount(address from, address to, suint256 amount) internal returns (bytes memory) {
         MYieldToOneStorageStruct storage $ = _getMYieldToOneStorageLocation();
         bytes memory pubKey = $.publicKeys[to];
 
-        if (pubKey.length == 0) {
-            emit Transfer(from, to, bytes(""));
-            return;
-        }
+        if (pubKey.length == 0) return bytes("");
 
         if (bytes32($.contractPrivateKey) == bytes32(0)) revert ContractKeyNotSet();
 
@@ -523,9 +526,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         sbytes32 sharedSecret = _ecdh($.contractPrivateKey, pubKey);
         sbytes32 aesKey = _hkdf(sharedSecret);
         bytes12 nonce = bytes12(keccak256(abi.encode(from, to, n)));
-        bytes memory ciphertext = _aesGcmEncrypt(aesKey, nonce, abi.encode(uint256(amount)));
 
-        emit Transfer(from, to, ciphertext);
+        return _aesGcmEncrypt(aesKey, nonce, abi.encode(uint256(amount)));
     }
 
     /**
@@ -561,16 +563,23 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
     }
 
     /**
-     * @dev   Writes the shielded `shieldedAllowance` slot (never the inherited one); reuses `_beforeApprove`.
+     * @dev   Writes the shielded `shieldedAllowance` slot (never the inherited one); reuses
+     *        `_beforeApprove`. `encryptEmit`: true => encrypted-bytes Approval to `spender`'s
+     *        registered key (user path); false => plaintext Approval(uint256) (infra path,
+     *        amount already public in plain calldata).
      */
-    function _shieldedApprove(address account, address spender, suint256 amount) internal {
+    function _shieldedApprove(address account, address spender, suint256 amount, bool encryptEmit) internal {
         uint256 amount_ = uint256(amount);
 
         _beforeApprove(account, spender, amount_);
 
         _getMYieldToOneStorageLocation().shieldedAllowance[account][spender] = amount;
 
-        emit Approval(account, spender, amount_);
+        if (encryptEmit) {
+            emit Approval(account, spender, _encryptAmount(account, spender, amount));
+        } else {
+            emit Approval(account, spender, amount_);
+        }
     }
 
     /**

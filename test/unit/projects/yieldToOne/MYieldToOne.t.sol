@@ -310,8 +310,11 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     function test_approve_writesShieldedStorage() public {
         uint256 amount = 1_000e6;
 
-        vm.expectEmit();
-        emit IERC20.Approval(alice, bob, amount);
+        _installContractKey();
+
+        // bob has no registered key => empty-ciphertext fallback emit on the bytes overload.
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Approval(alice, bob, bytes(""));
 
         vm.prank(alice);
         mYieldToOne.approve(bob, suint256(amount));
@@ -1420,6 +1423,121 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(amount));
+    }
+
+    /* ============ Shielded Approve — Encrypted Emit ============ */
+
+    function test_shieldedApprove_registeredSpender_emitsBytesPayload() external {
+        uint256 amount = 1_000e6;
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
+
+        vm.recordLogs();
+
+        vm.prank(alice);
+        mYieldToOne.approve(bob, suint256(amount));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 bytesTopic = keccak256("Approval(address,address,bytes)");
+        bytes32 plaintextTopic = keccak256("Approval(address,address,uint256)");
+
+        bool foundBytes;
+        bool foundPlaintext;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(mYieldToOne)) continue;
+            if (logs[i].topics.length == 0) continue;
+
+            if (logs[i].topics[0] == bytesTopic) {
+                foundBytes = true;
+                assertEq(address(uint160(uint256(logs[i].topics[1]))), alice);
+                assertEq(address(uint160(uint256(logs[i].topics[2]))), bob);
+                bytes memory payload = abi.decode(logs[i].data, (bytes));
+                assertGt(payload.length, 0);
+            } else if (logs[i].topics[0] == plaintextTopic) {
+                foundPlaintext = true;
+            }
+        }
+
+        assertTrue(foundBytes, "missing Approval(address,address,bytes) emit");
+        assertFalse(foundPlaintext, "plaintext Approval(uint256) emitted on shielded path");
+
+        assertEq(mYieldToOne.getShieldedAllowance(alice, bob), amount);
+    }
+
+    function test_shieldedApprove_unregisteredSpender_emitsEmptyBytes() external {
+        uint256 amount = 1_000e6;
+
+        _installContractKey();
+
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Approval(alice, bob, bytes(""));
+
+        vm.prank(alice);
+        mYieldToOne.approve(bob, suint256(amount));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
+        assertEq(mYieldToOne.getShieldedAllowance(alice, bob), amount);
+    }
+
+    function test_shieldedApprove_contractKeyNotSet_reverts() external {
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.expectRevert(IMYieldToOne.ContractKeyNotSet.selector);
+
+        vm.prank(alice);
+        mYieldToOne.approve(bob, suint256(1_000e6));
+    }
+
+    function test_nativeApprove_emitsPlaintext() external {
+        uint256 amount = 1_000e6;
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(bob, true);
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.recordLogs();
+
+        vm.prank(alice);
+        mYieldToOne.approve(bob, amount);
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 bytesTopic = keccak256("Approval(address,address,bytes)");
+        bytes32 plaintextTopic = keccak256("Approval(address,address,uint256)");
+
+        bool foundBytes;
+        bool foundPlaintext;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(mYieldToOne)) continue;
+            if (logs[i].topics.length == 0) continue;
+
+            if (logs[i].topics[0] == bytesTopic) {
+                foundBytes = true;
+            } else if (logs[i].topics[0] == plaintextTopic) {
+                foundPlaintext = true;
+                assertEq(address(uint160(uint256(logs[i].topics[1]))), alice);
+                assertEq(address(uint160(uint256(logs[i].topics[2]))), bob);
+                assertEq(abi.decode(logs[i].data, (uint256)), amount);
+            }
+        }
+
+        assertTrue(foundPlaintext, "missing plaintext Approval(uint256) emit on infra path");
+        assertFalse(foundBytes, "infra path leaked into encrypted-bytes Approval overload");
     }
 
     /* ============ Dual-Emit Regression — Infra transferFrom stays plaintext ============ */

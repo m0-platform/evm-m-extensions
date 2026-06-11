@@ -43,6 +43,19 @@ interface IMYieldToOne {
     event Transfer(address indexed from, address indexed to, bytes encryptedAmount);
 
     /**
+     * @notice Emitted by user shielded approvals (the `suint256` overload). The third field is an
+     *         AES-GCM ciphertext of the allowance, encrypted to the spender's registered key via
+     *         ECDH; empty bytes if the spender has not registered one.
+     * @dev    Distinct `topic0` from the inherited `Approval(address,address,uint256)` — indexers
+     *         MUST subscribe to both. The native infra `approve(address,uint256)` path emits the
+     *         inherited `uint256` overload exclusively.
+     * @param  account         The account granting the allowance.
+     * @param  spender         The account allowed to spend on behalf of `account`.
+     * @param  encryptedAmount AES-GCM ciphertext of the allowance, or `bytes("")` if `spender` is unregistered.
+     */
+    event Approval(address indexed account, address indexed spender, bytes encryptedAmount);
+
+    /**
      * @notice Emitted by `setContractKey` once the contract keypair is installed. Only the
      *         public key is logged; the private key is held in shielded storage and is
      *         never observable from logs or events.
@@ -160,7 +173,9 @@ interface IMYieldToOne {
     function transfer(address recipient, suint256 amount) external returns (bool);
 
     /**
-     * @notice Shielded ERC20 approve. Stores the allowance as `suint256`.
+     * @notice Shielded ERC20 approve. Stores the allowance as `suint256`. Emits the encrypted-bytes
+     *         `Approval(address,address,bytes)` overload to `spender`'s registered key (empty
+     *         ciphertext if `spender` has not registered one).
      * @param  spender The address allowed to spend on behalf of `msg.sender`.
      * @param  amount  The shielded allowance amount. Use `suint256(type(uint256).max)` for an
      *                 infinite, non-decrementing allowance (matches `ERC20ExtendedUpgradeable`).
