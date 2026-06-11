@@ -29,44 +29,34 @@ interface IMYieldToOne {
     event AllowlistSet(address indexed account, bool status);
 
     /**
-     * @notice Emitted by user-to-user shielded transfers (the `suint256` overloads). The third field
-     *         is an AES-GCM ciphertext of the amount, encrypted to the recipient's registered key via
-     *         ECDH; empty bytes if the recipient has not registered one (the transfer still succeeds,
-     *         and the amount is recoverable only via the recipient's gated `balanceOf`).
-     * @dev    Distinct `topic0` from the inherited `Transfer(address,address,uint256)` — indexers MUST
-     *         subscribe to both. Infra paths (mint, burn, native `transferFrom`, forced transfer) emit
-     *         the inherited `uint256` overload exclusively.
+     * @notice Emitted by user-path shielded transfers (the `suint256` overloads); the amount is
+     *         encrypted to the recipient's registered key.
+     * @dev    Distinct `topic0` from the inherited `Transfer(address,address,uint256)` — indexers MUST track both.
      * @param  from            The address transferring the tokens.
      * @param  to              The address receiving the tokens.
-     * @param  encryptedAmount AES-GCM ciphertext of the amount, or `bytes("")` if `to` is unregistered.
+     * @param  encryptedAmount AES-GCM ciphertext of the amount; empty bytes if `to` has no registered key.
      */
     event Transfer(address indexed from, address indexed to, bytes encryptedAmount);
 
     /**
-     * @notice Emitted by user shielded approvals (the `suint256` overload). The third field is an
-     *         AES-GCM ciphertext of the allowance, encrypted to the spender's registered key via
-     *         ECDH; empty bytes if the spender has not registered one.
-     * @dev    Distinct `topic0` from the inherited `Approval(address,address,uint256)` — indexers
-     *         MUST subscribe to both. The native infra `approve(address,uint256)` path emits the
-     *         inherited `uint256` overload exclusively.
+     * @notice Emitted by user-path shielded approvals (the `suint256` overload); the allowance is
+     *         encrypted to the spender's registered key.
+     * @dev    Distinct `topic0` from the inherited `Approval(address,address,uint256)` — indexers MUST track both.
      * @param  account         The account granting the allowance.
      * @param  spender         The account allowed to spend on behalf of `account`.
-     * @param  encryptedAmount AES-GCM ciphertext of the allowance, or `bytes("")` if `spender` is unregistered.
+     * @param  encryptedAmount AES-GCM ciphertext of the allowance; empty bytes if `spender` has no registered key.
      */
     event Approval(address indexed account, address indexed spender, bytes encryptedAmount);
 
     /**
-     * @notice Emitted by `setContractKey` once the contract keypair is installed. Only the
-     *         public key is logged; the private key is held in shielded storage and is
-     *         never observable from logs or events.
+     * @notice Emitted when the contract's encrypted-event keypair is installed; only the public key is logged.
      * @param  publicKey The contract's compressed (33-byte) secp256k1 public key.
      */
     event ContractKeySet(bytes publicKey);
 
     /**
-     * @notice Emitted by `registerPublicKey` when an account installs or overwrites its
-     *         recipient public key for encrypted-event decryption.
-     * @param  account The account whose recipient public key was (re-)registered.
+     * @notice Emitted when an account registers (or overwrites) its public key for encrypted-event decryption.
+     * @param  account The account whose public key was registered.
      */
     event PublicKeyRegistered(address indexed account);
 
@@ -81,47 +71,39 @@ interface IMYieldToOne {
     /// @notice Emitted in initializer if Admin is 0x0.
     error ZeroAdmin();
 
-    /// @notice Emitted when a public read accesses a shielded value without holder authorization
-    ///         (caller must use a Seismic signed read with `msg.sender == account`).
+    /// @notice Emitted when a gated read (`balanceOf` / `allowance`) is called by an unauthorized account.
     error Unauthorized();
 
-    /// @notice Reverted when native `IERC20.approve` is called with a non-allowlisted spender, or
-    ///         when the `permit` path is invoked. Holders must use the shielded
-    ///         `approve(address,suint256)` overload, or approve an allowlisted infra address.
+    /// @notice Emitted when the native `approve` is called with a non-infra spender, or `permit` is
+    ///         called; use the shielded `approve(address,suint256)` overload instead.
     error UseShieldedApprove();
 
-    /// @notice Reverted when the native `IERC20.transfer` path is invoked, or when native
-    ///         `IERC20.transferFrom` is called by a non-allowlisted caller. Callers must use the
-    ///         shielded overloads; only allowlisted infra may use the native `transferFrom` path.
+    /// @notice Emitted when the native `transfer` is called, or the native `transferFrom` is called
+    ///         by a non-infra caller; use the shielded `suint256` overloads instead.
     error UseShieldedTransfer();
 
-    /// @notice Reverted in `setAllowlisted` if the account is the zero address.
+    /// @notice Emitted in `setAllowlisted` if the account is 0x0.
     error ZeroAllowlistAccount();
 
-    /// @notice Reverted by `setContractKey` / `registerPublicKey` if the supplied public
-    ///         key is not exactly 33 bytes (compressed secp256k1 encoding).
+    /// @notice Emitted in `setContractKey` and `registerPublicKey` if the public key is not 33 bytes.
     error InvalidPublicKeyLength();
 
-    /// @notice Reverted by `setContractKey` / `registerPublicKey` if the supplied public
-    ///         key does not start with a compressed-point prefix (`0x02` / `0x03`).
+    /// @notice Emitted in `setContractKey` and `registerPublicKey` if the public key prefix is not `0x02`/`0x03`.
     error InvalidPublicKeyPrefix();
 
-    /// @notice Reverted by `setContractKey` if the supplied private key is zero.
+    /// @notice Emitted in `setContractKey` if the private key is zero.
     error ZeroPrivateKey();
 
-    /// @notice Reverted by `setContractKey` if the contract keypair has already been
-    ///         installed. Rotation is deliberately not supported — a new key would orphan
-    ///         every historical ciphertext.
+    /// @notice Emitted in `setContractKey` if the contract keypair is already installed.
     error ContractKeyAlreadySet();
 
-    /// @notice Reverted by the encrypted-emit path if a shielded transfer or approval is
-    ///         attempted before the admin has called `setContractKey`.
+    /// @notice Emitted by the encrypted-event path if the contract keypair has not been installed.
     error ContractKeyNotSet();
 
-    /// @notice Reverted by an encrypted-emit precompile wrapper when the underlying
-    ///         `staticcall` to the Seismic precompile fails. `precompile` is the address
-    ///         of the precompile that returned a failing result (0x65 ECDH, 0x66 AES-GCM,
-    ///         0x68 HKDF).
+    /**
+     * @notice Emitted when a Seismic precompile staticcall fails.
+     * @param  precompile The failing precompile address (0x65 ECDH, 0x66 AES-GCM, 0x68 HKDF).
+     */
     error PrecompileFailed(address precompile);
 
     /* ============ Interactive Functions ============ */
@@ -141,12 +123,8 @@ interface IMYieldToOne {
     /**
      * @notice Adds or removes `account` from the infra allowlist.
      * @dev    MUST only be callable by the DEFAULT_ADMIN_ROLE.
-     * @dev    Allowlisted addresses MUST be audited M0 infrastructure contracts (e.g. Portal,
-     *         LimitOrderProtocol) — never EOAs or contracts that re-expose `balanceOf`. (SwapFacility
-     *         is permanently exempt via the immutable and does not need allowlisting.) An
-     *         allowlisted address may use the native `uint256` `approve`
-     *         (as spender) and `transferFrom` (as caller) paths and may read any holder's cleartext
-     *         `balanceOf`.
+     * @dev    Allowlisted addresses MUST be audited M0 infra contracts, never EOAs or contracts re-exposing `balanceOf`.
+     * @dev    Grants native `approve` (as spender) and `transferFrom` (as caller) paths and ungated `balanceOf` reads.
      * @dev    SHOULD revert if `account` is 0x0. SHOULD return early if the status is unchanged.
      * @param  account The address whose allowlist status is being set.
      * @param  status  The new allowlist status (`true` = allowlisted).
@@ -163,66 +141,48 @@ interface IMYieldToOne {
     function setAllowlisted(address[] calldata accounts, bool status) external;
 
     /**
-     * @notice Shielded ERC20 transfer. `amount` is stored and compared in shielded space. Emits the
-     *         encrypted-bytes `Transfer(address,address,bytes)` overload to `recipient`'s registered
-     *         key (empty ciphertext if `recipient` has not registered one — transfer still succeeds).
+     * @notice Shielded ERC20 transfer of `amount` tokens to `recipient`.
+     * @dev    Emits the encrypted-bytes `Transfer(address,address,bytes)` overload.
      * @param  recipient The address receiving the tokens.
      * @param  amount    The shielded amount to transfer.
-     * @return success   Always `true` on non-revert (mirrors `IERC20.transfer`).
+     * @return Whether or not the transfer was successful.
      */
     function transfer(address recipient, suint256 amount) external returns (bool);
 
     /**
-     * @notice Shielded ERC20 approve. Stores the allowance as `suint256`. Emits the encrypted-bytes
-     *         `Approval(address,address,bytes)` overload to `spender`'s registered key (empty
-     *         ciphertext if `spender` has not registered one).
+     * @notice Shielded ERC20 approval of `spender` for `amount` of the caller's tokens.
+     * @dev    Emits the encrypted-bytes `Approval(address,address,bytes)` overload.
      * @param  spender The address allowed to spend on behalf of `msg.sender`.
-     * @param  amount  The shielded allowance amount. Use `suint256(type(uint256).max)` for an
-     *                 infinite, non-decrementing allowance (matches `ERC20ExtendedUpgradeable`).
-     * @return success Always `true` on non-revert.
+     * @param  amount  The shielded allowance; `suint256(type(uint256).max)` is an infinite, non-decrementing allowance.
+     * @return Whether or not the approval was successful.
      */
     function approve(address spender, suint256 amount) external returns (bool);
 
     /**
-     * @notice Shielded ERC20 transferFrom. Reads and decrements the shielded allowance in shielded
-     *         space; reverts `InsufficientAllowance(spender, 0, amount)` (zeroed payload). Emits the
-     *         encrypted-bytes `Transfer` overload (empty ciphertext if `recipient` is unregistered).
+     * @notice Shielded ERC20 transferFrom; reads and decrements the allowance in shielded space.
+     * @dev    Emits the encrypted-bytes `Transfer(address,address,bytes)` overload.
      * @param  sender    The address whose tokens are being moved.
      * @param  recipient The address receiving the tokens.
      * @param  amount    The shielded amount to transfer.
-     * @return success   Always `true` on non-revert.
+     * @return Whether or not the transfer was successful.
      */
     function transferFrom(address sender, address recipient, suint256 amount) external returns (bool);
 
     /**
-     * @notice Installs the contract's encryption keypair used to derive per-recipient
-     *         AES-GCM keys for shielded `Transfer` event payloads. One-shot: reverts
-     *         `ContractKeyAlreadySet` on any subsequent call.
-     * @dev    MUST only be callable by the `DEFAULT_ADMIN_ROLE`.
-     * @dev    MUST be sent as a Seismic `TxSeismic` transaction (type `0x4A`) so the
-     *         private key is encrypted in calldata. This is an operational requirement
-     *         that cannot be enforced from Solidity.
-     * @dev    Deliberately not folded into `initialize()`: initializer calldata travels in
-     *         plaintext inside the proxy deployment, which would leak the private key. Until
-     *         this is called, ALL user-path shielded transfers/approves revert `ContractKeyNotSet`.
-     * @dev    Reverts `InvalidPublicKeyLength` unless `publicKey.length == 33` and
-     *         `InvalidPublicKeyPrefix` unless `publicKey[0]` is `0x02` / `0x03`.
-     * @dev    Reverts `ZeroPrivateKey` if `privateKey` is zero (a zero key would bypass
-     *         the one-shot guard and leave the contract key-less).
-     * @dev    Rotation is intentionally out of scope: rotating the contract key would
-     *         orphan every historical ciphertext stored in past events.
-     * @param  privateKey The contract's secp256k1 private key, shielded at the ABI
-     *                   boundary so it remains in flagged storage.
+     * @notice Installs the contract's encrypted-event keypair; one-shot, reverts `ContractKeyAlreadySet`
+     *         on any subsequent call. Until installed, user-path shielded transfers and approvals
+     *         revert `ContractKeyNotSet`.
+     * @dev    MUST only be callable by the DEFAULT_ADMIN_ROLE.
+     * @dev    MUST be sent as a `TxSeismic` (type 0x4A) transaction — plain calldata would leak the private key.
+     * @dev    Rotation is unsupported: a new contract key would orphan every historical ciphertext.
+     * @param  privateKey The contract's secp256k1 private key, shielded at the ABI boundary.
      * @param  publicKey  The contract's compressed (33-byte) secp256k1 public key.
      */
     function setContractKey(sbytes32 privateKey, bytes calldata publicKey) external;
 
     /**
-     * @notice Registers the caller's recipient public key. Idempotent — a subsequent call
-     *         overwrites the previously registered key (future ciphertexts use the new
-     *         key; historical ciphertexts remain decryptable only with the old key).
-     * @dev    Reverts `InvalidPublicKeyLength` unless `publicKey.length == 33` and
-     *         `InvalidPublicKeyPrefix` unless `publicKey[0]` is `0x02` / `0x03`.
+     * @notice Registers the caller's public key for encrypted-event payloads; a subsequent call
+     *         overwrites the previously registered key.
      * @param  publicKey The caller's compressed (33-byte) secp256k1 public key.
      */
     function registerPublicKey(bytes calldata publicKey) external;
@@ -246,18 +206,15 @@ interface IMYieldToOne {
     function isAllowlisted(address account) external view returns (bool);
 
     /**
-     * @notice Returns the recipient public key previously registered by `account` via
-     *         `registerPublicKey`, or empty bytes if none has been registered. Plain
-     *         (non-shielded) read — readable by any caller.
+     * @notice Returns the public key registered by `account`, or empty bytes if none; readable by any caller.
      * @param  account The address whose registered public key is being queried.
      * @return The registered compressed (33-byte) secp256k1 public key, or empty bytes.
      */
     function publicKeyOf(address account) external view returns (bytes memory);
 
     /**
-     * @notice Returns the contract's currently installed public key, or empty bytes if
-     *         `setContractKey` has not yet been called. Plain (non-shielded) read —
-     *         off-chain decryption clients fetch this to verify the ECDH peer.
+     * @notice Returns the contract's installed public key, or empty bytes if `setContractKey` has not
+     *         been called; readable by any caller.
      * @return The contract's compressed (33-byte) secp256k1 public key, or empty bytes.
      */
     function contractPublicKey() external view returns (bytes memory);
