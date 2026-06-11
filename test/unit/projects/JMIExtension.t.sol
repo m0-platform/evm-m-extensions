@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.26;
 
+import { Vm } from "../../../lib/forge-std/src/Vm.sol";
+
 import { IERC20 } from "../../../lib/common/src/interfaces/IERC20.sol";
 import { IERC20Extended } from "../../../lib/common/src/interfaces/IERC20Extended.sol";
 
@@ -386,13 +388,52 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         vm.prank(address(swapFacility));
         jmi.wrap(address(mockUSDC), alice, amount);
 
-        assertEq(jmi.balanceOf(alice), amount);
+        assertEq(jmi.getBalanceOf(alice), amount);
         assertEq(jmi.assetBalanceOf(address(mockUSDC)), amount);
         assertEq(jmi.totalAssets(), amount);
         assertEq(jmi.totalSupply(), amount);
 
         assertEq(mockUSDC.balanceOf(alice), 0);
         assertEq(mockUSDC.balanceOf(address(jmi)), amount);
+    }
+
+    function test_wrap_assetDeposit_emitsPlaintextOnly() public {
+        uint256 amount = 1_000e6;
+
+        _installContractKey();
+
+        vm.prank(alice);
+        jmi.registerPublicKey(_validPubKey(0xBB));
+
+        mockUSDC.mint(address(swapFacility), amount);
+
+        vm.recordLogs();
+
+        vm.prank(address(swapFacility));
+        jmi.wrap(address(mockUSDC), alice, amount);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
+
+        bool foundBytes;
+        bool foundPlaintext;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(jmi)) continue;
+            if (logs[i].topics.length == 0) continue;
+
+            if (logs[i].topics[0] == bytesTopic) {
+                foundBytes = true;
+            } else if (logs[i].topics[0] == plaintextTopic) {
+                foundPlaintext = true;
+            }
+        }
+
+        assertTrue(foundPlaintext, "missing plaintext Transfer(uint256) on asset deposit");
+        assertFalse(foundBytes, "bytes-overload Transfer emitted on asset deposit");
+
+        assertEq(jmi.getEncryptedEventNonce(), 0);
+        assertEq(jmi.getBalanceOf(alice), amount);
     }
 
     function test_wrap_diffDecimals() public {
@@ -417,7 +458,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         vm.prank(address(swapFacility));
         jmi.wrap(address(mockDAI), alice, mockDAIAmount);
 
-        assertEq(jmi.balanceOf(alice), extensionAmount);
+        assertEq(jmi.getBalanceOf(alice), extensionAmount);
         assertEq(jmi.assetBalanceOf(address(mockDAI)), mockDAIAmount);
         assertEq(jmi.totalAssets(), extensionAmount);
         assertEq(jmi.totalSupply(), extensionAmount);
@@ -441,7 +482,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         vm.prank(address(swapFacility));
         jmi.wrap(address(mockAsset4Decimals), alice, mockAsset4DecimalsAmount);
 
-        assertEq(jmi.balanceOf(alice), extensionAmount * 2);
+        assertEq(jmi.getBalanceOf(alice), extensionAmount * 2);
         assertEq(jmi.assetBalanceOf(address(mockAsset4Decimals)), mockAsset4DecimalsAmount);
         assertEq(jmi.totalAssets(), extensionAmount * 2);
         assertEq(jmi.totalSupply(), extensionAmount * 2);
@@ -509,7 +550,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
             return;
         }
 
-        assertEq(jmi.balanceOf(alice), amount);
+        assertEq(jmi.getBalanceOf(alice), amount);
         assertEq(jmi.assetBalanceOf(address(mockUSDC)), amount);
         assertEq(jmi.totalAssets(), amount);
         assertEq(jmi.totalSupply(), amount);
@@ -550,7 +591,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
             return;
         }
 
-        assertEq(jmi.balanceOf(alice), extensionAmount);
+        assertEq(jmi.getBalanceOf(alice), extensionAmount);
         assertEq(jmi.assetBalanceOf(address(asset)), amount);
         assertEq(jmi.totalAssets(), extensionAmount);
         assertEq(jmi.totalSupply(), extensionAmount);
@@ -604,7 +645,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         totalUnwrapAmount += unwrapAmount;
 
         assertEq(jmi.totalSupply(), totalSupply);
-        assertEq(jmi.balanceOf(address(swapFacility)), totalSupply);
+        assertEq(jmi.getBalanceOf(address(swapFacility)), totalSupply);
         assertEq(mToken.balanceOf(address(swapFacility)), totalUnwrapAmount);
 
         unwrapAmount = 499e6;
@@ -619,7 +660,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         totalUnwrapAmount += unwrapAmount;
 
         assertEq(jmi.totalSupply(), totalSupply);
-        assertEq(jmi.balanceOf(address(swapFacility)), totalSupply);
+        assertEq(jmi.getBalanceOf(address(swapFacility)), totalSupply);
         assertEq(mToken.balanceOf(address(swapFacility)), totalUnwrapAmount);
 
         unwrapAmount = 500e6;
@@ -634,7 +675,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         totalUnwrapAmount += unwrapAmount;
 
         assertEq(jmi.totalSupply(), totalSupply);
-        assertEq(jmi.balanceOf(address(swapFacility)), totalSupply);
+        assertEq(jmi.getBalanceOf(address(swapFacility)), totalSupply);
 
         assertEq(mToken.balanceOf(address(swapFacility)), totalUnwrapAmount);
         assertEq(mToken.balanceOf(address(jmi)), 0);
@@ -676,13 +717,13 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         }
 
         assertEq(jmi.totalSupply(), totalSupply - amount);
-        assertEq(jmi.balanceOf(address(swapFacility)), totalSupply - amount);
+        assertEq(jmi.getBalanceOf(address(swapFacility)), totalSupply - amount);
 
         assertEq(mToken.balanceOf(address(swapFacility)), amount);
         assertEq(mToken.balanceOf(address(jmi)), mSupply - amount);
     }
 
-    /* ============ transfer ============ */
+    /* ============ transfer (shielded) ============ */
 
     function test_transfer_enforcedPause() external {
         vm.prank(pauser);
@@ -691,11 +732,13 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
 
         vm.prank(alice);
-        jmi.transfer(bob, 1);
+        jmi.transfer(bob, suint256(1));
     }
 
-    function test_transfer() external {
+    function test_shieldedTransfer() external {
         uint256 amount = 1_000e6;
+
+        _installContractKey();
 
         mockUSDC.mint(address(swapFacility), amount);
         assertEq(mockUSDC.balanceOf(address(swapFacility)), amount);
@@ -703,22 +746,94 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         vm.prank(address(swapFacility));
         jmi.wrap(address(mockUSDC), alice, amount);
 
-        assertEq(jmi.balanceOf(alice), amount);
-        assertEq(jmi.balanceOf(bob), 0);
+        assertEq(jmi.getBalanceOf(alice), amount);
+        assertEq(jmi.getBalanceOf(bob), 0);
 
         assertEq(jmi.assetBalanceOf(address(mockUSDC)), amount);
         assertEq(jmi.totalAssets(), amount);
         assertEq(jmi.totalSupply(), amount);
+
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Transfer(alice, bob, bytes(""));
 
         vm.prank(alice);
-        jmi.transfer(bob, amount);
+        jmi.transfer(bob, suint256(amount));
 
-        assertEq(jmi.balanceOf(alice), 0);
-        assertEq(jmi.balanceOf(bob), amount);
+        assertEq(jmi.getBalanceOf(alice), 0);
+        assertEq(jmi.getBalanceOf(bob), amount);
 
         assertEq(jmi.assetBalanceOf(address(mockUSDC)), amount);
         assertEq(jmi.totalAssets(), amount);
         assertEq(jmi.totalSupply(), amount);
+    }
+
+    function test_transfer_inheritedPathReverts() external {
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+
+        vm.prank(alice);
+        jmi.transfer(bob, 1_000e6);
+    }
+
+    function test_transfer_inheritedPathRevertsWhenPaused() external {
+        vm.prank(pauser);
+        jmi.pause();
+
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+
+        vm.prank(alice);
+        jmi.transfer(bob, 1);
+    }
+
+    /* ============ transferFrom (native) ============ */
+
+    function test_nativeTransferFrom_allowlistedCaller() public {
+        uint256 amount = 1_000e6;
+        uint256 allowanceAmount = 1_500e6;
+        jmi.setBalanceOf(alice, amount);
+
+        _installContractKey();
+
+        vm.prank(admin);
+        jmi.setAllowlisted(carol, true);
+
+        vm.prank(alice);
+        jmi.approve(carol, suint256(allowanceAmount));
+
+        vm.expectEmit();
+        emit IERC20.Transfer(alice, bob, amount);
+
+        vm.prank(carol);
+        jmi.transferFrom(alice, bob, amount);
+
+        assertEq(jmi.getBalanceOf(alice), 0);
+        assertEq(jmi.getBalanceOf(bob), amount);
+
+        vm.prank(alice);
+        assertEq(jmi.allowance(alice, carol), allowanceAmount - amount);
+    }
+
+    /* ============ balanceOf ============ */
+
+    function test_balanceOf_holderCanRead() public {
+        jmi.setBalanceOf(alice, 1_000e6);
+
+        vm.prank(alice);
+        assertEq(jmi.balanceOf(alice), 1_000e6);
+    }
+
+    function test_balanceOf_unauthorized() public {
+        jmi.setBalanceOf(alice, 1_000e6);
+
+        vm.expectRevert(IMYieldToOne.Unauthorized.selector);
+        vm.prank(bob);
+        jmi.balanceOf(alice);
+    }
+
+    function test_balanceOf_swapFacilityCanRead() public {
+        jmi.setBalanceOf(alice, 1_000e6);
+
+        vm.prank(address(swapFacility));
+        assertEq(jmi.balanceOf(alice), 1_000e6);
     }
 
     /* ============ replaceAssetWithM ============ */
@@ -847,7 +962,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         vm.prank(address(swapFacility));
         jmi.replaceAssetWithM(address(mockUSDC), alice, amount);
 
-        assertEq(jmi.balanceOf(alice), 0);
+        assertEq(jmi.getBalanceOf(alice), 0);
         assertEq(jmi.assetBalanceOf(address(mockUSDC)), 0);
         assertEq(jmi.totalAssets(), 0);
         assertEq(jmi.totalSupply(), amount);
@@ -894,7 +1009,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         vm.prank(address(swapFacility));
         jmi.replaceAssetWithM(address(mockDAI), alice, extensionAmount);
 
-        assertEq(jmi.balanceOf(alice), 0);
+        assertEq(jmi.getBalanceOf(alice), 0);
         assertEq(jmi.totalAssets(), extensionAmount);
         assertEq(jmi.totalSupply(), totalAmount);
 
@@ -920,7 +1035,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         vm.prank(address(swapFacility));
         jmi.replaceAssetWithM(address(mockAsset4Decimals), alice, extensionAmount);
 
-        assertEq(jmi.balanceOf(alice), 0);
+        assertEq(jmi.getBalanceOf(alice), 0);
         assertEq(jmi.assetBalanceOf(address(mockAsset4Decimals)), 0);
         assertEq(jmi.totalAssets(), 0);
         assertEq(jmi.totalSupply(), totalAmount);
@@ -983,7 +1098,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
             return;
         }
 
-        assertEq(jmi.balanceOf(alice), 0);
+        assertEq(jmi.getBalanceOf(alice), 0);
         assertEq(jmi.assetBalanceOf(address(mockUSDC)), usdcBacking - amount);
         assertEq(jmi.totalAssets(), usdcBacking - amount);
         assertEq(jmi.totalSupply(), extensionSupply);
@@ -1078,7 +1193,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
             return;
         }
 
-        assertEq(jmi.balanceOf(alice), 0);
+        assertEq(jmi.getBalanceOf(alice), 0);
         assertEq(jmi.assetBalanceOf(address(asset)), assetBacking - amount);
         assertEq(jmi.totalAssets(), extensionBacking - extensionAmount);
         assertEq(jmi.totalSupply(), extensionSupply);
@@ -1137,7 +1252,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         assertEq(jmi.totalSupply(), 3_000e6);
 
         assertEq(mToken.balanceOf(yieldRecipient), 0);
-        assertEq(jmi.balanceOf(yieldRecipient), yield);
+        assertEq(jmi.getBalanceOf(yieldRecipient), yield);
     }
 
     /* ============ _fromAssetToExtensionAmount ============ */
@@ -1191,6 +1306,22 @@ contract JMIExtensionUnitTests is BaseUnitTest {
     }
 
     /* ============ Helper Functions ============ */
+
+    /// @dev Returns a 33-byte compressed-secp256k1-shaped public key; contents are arbitrary.
+    function _validPubKey(bytes1 marker) internal pure returns (bytes memory) {
+        bytes memory key = new bytes(33);
+        key[0] = 0x02; // compressed-secp256k1 even-Y prefix
+        for (uint256 i = 1; i < 33; ++i) {
+            key[i] = marker;
+        }
+        return key;
+    }
+
+    /// @dev Installs the contract keypair through the admin path.
+    function _installContractKey() internal {
+        vm.prank(admin);
+        jmi.setContractKey(sbytes32(bytes32(uint256(0xC0FFEE))), _validPubKey(0xAA));
+    }
 
     /// @dev Helper function to randomly select one of the 3 stablecoins based on a seed
     function _getRandomAsset(uint256 seed) internal view returns (MockERC20 asset, uint256 cap, uint8 decimals) {
