@@ -314,6 +314,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
 
     /// @inheritdoc IMYieldToOne
     function yield() public view virtual returns (uint256) {
+        // NOTE: Can be `unchecked` because the subtraction only runs when `balance_ > totalSupply_`.
         unchecked {
             uint256 balance_ = _mBalanceOf(address(this));
             uint256 totalSupply_ = totalSupply();
@@ -462,6 +463,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
 
         // Infinite-allowance shortcut (mirrors ERC20ExtendedUpgradeable.transferFrom)
         if (uint256(spenderAllowance) != type(uint256).max) {
+            // NOTE: Branching on a shielded value leaks a 1-bit comparison via revert-vs-success;
+            //       accepted — inherent to ERC20 insufficient-allowance semantics (ssolc 10311).
             if (spenderAllowance < amount) revert IERC20Extended.InsufficientAllowance(msg.sender, 0, uint256(amount));
 
             // NOTE: Can be `unchecked` because the `spenderAllowance < amount` check above guarantees
@@ -494,6 +497,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
 
         if (amount_ == 0) return;
 
+        // NOTE: Branching on a shielded value leaks a 1-bit comparison via revert-vs-success;
+        //       accepted — inherent to ERC20 insufficient-balance semantics (ssolc 10311).
         if (_getMYieldToOneStorageLocation().balanceOf[sender] < amount) {
             revert InsufficientBalance(sender, 0, amount_);
         }
@@ -614,6 +619,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
      *        payload, no balance leak. The `IMExtension.InsufficientBalance` shape is unchanged.
      */
     function _revertIfInsufficientBalance(address account, uint256 amount) internal view override {
+        // NOTE: Branching on a shielded value leaks a 1-bit comparison via revert-vs-success;
+        //       accepted — inherent to ERC20 insufficient-balance semantics (ssolc 10311).
         if (_balanceOf(account) < suint256(amount)) revert InsufficientBalance(account, 0, amount);
     }
 
