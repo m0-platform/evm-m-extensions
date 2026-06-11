@@ -178,7 +178,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     }
 
     function test_setAllowlisted_noUpdate() public {
-        // Setting an account to its current (default `false`) status is a no-op: no event.
         vm.recordLogs();
 
         vm.prank(admin);
@@ -194,7 +193,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         assertTrue(mYieldToOne.isAllowlisted(bob));
 
-        // Re-setting the same status emits no second event and leaves state unchanged.
         vm.recordLogs();
 
         vm.prank(admin);
@@ -281,7 +279,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     /* ============ isAllowlisted ============ */
 
     function test_isAllowlisted_swapFacilityNotAllowlisted() public view {
-        // swapFacility is permanently infra via the immutable, not via the allowlist mapping.
         assertFalse(mYieldToOne.isAllowlisted(address(swapFacility)));
     }
 
@@ -323,7 +320,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     }
 
     function test_approve_inheritedPathReverts() public {
-        // The IERC20 `approve(address,uint256)` is overridden to revert at the entry point.
         vm.expectRevert(IMYieldToOne.UseShieldedApprove.selector);
 
         vm.prank(alice);
@@ -331,8 +327,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     }
 
     function test_approve_permitReverts() public {
-        // Inherited EIP-2612 `permit` is overridden to revert directly at the entry point —
-        // both the v/r/s overload and the bytes-signature overload.
         vm.expectRevert(IMYieldToOne.UseShieldedApprove.selector);
         mYieldToOne.permit(alice, bob, 1_000e6, type(uint256).max, 0, bytes32(0), bytes32(0));
 
@@ -340,10 +334,9 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.permit(alice, bob, 1_000e6, type(uint256).max, "");
     }
 
-    /* ============ approve (native, allowlist-gated) ============ */
+    /* ============ approve (native) ============ */
 
     function test_nativeApprove_nonInfraSpenderReverts() public {
-        // bob is not allowlisted and not the swapFacility → native path is closed.
         vm.expectRevert(IMYieldToOne.UseShieldedApprove.selector);
 
         vm.prank(alice);
@@ -362,14 +355,12 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(alice);
         mYieldToOne.approve(bob, amount);
 
-        // Native path writes the SAME shielded slot as the shielded `approve(address,suint256)`.
         assertEq(mYieldToOne.getShieldedAllowance(alice, bob), amount);
     }
 
     function test_nativeApprove_swapFacilitySpender() public {
         uint256 amount = 1_000e6;
 
-        // swapFacility is permanently infra via the immutable — no allowlisting needed.
         vm.expectEmit();
         emit IERC20.Approval(alice, address(swapFacility), amount);
 
@@ -386,7 +377,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(freezeManager);
         mYieldToOne.freeze(alice);
 
-        // Freeze is still enforced on the native path (routes through `_beforeApprove`).
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
 
         vm.prank(alice);
@@ -406,14 +396,26 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.approve(bob, 1_000e6);
     }
 
-    /* ============ transferFrom (native, allowlist-gated) ============ */
+    function test_nativeApprove_delistedSpenderReverts() public {
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(bob, true);
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(bob, false);
+
+        vm.expectRevert(IMYieldToOne.UseShieldedApprove.selector);
+
+        vm.prank(alice);
+        mYieldToOne.approve(bob, 1_000e6);
+    }
+
+    /* ============ transferFrom (native) ============ */
 
     function test_nativeTransferFrom_nonInfraCallerReverts() public {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
         mYieldToOne.setShieldedAllowance(alice, carol, amount);
 
-        // carol is not allowlisted and not the swapFacility → native path is closed.
         vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
 
         vm.prank(carol);
@@ -441,7 +443,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         assertEq(mYieldToOne.getBalanceOf(alice), 0);
         assertEq(mYieldToOne.getBalanceOf(bob), amount);
-        // Decrements the shared shielded allowance slot.
         assertEq(mYieldToOne.getShieldedAllowance(alice, carol), allowanceAmount - amount);
     }
 
@@ -480,7 +481,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(carol);
         mYieldToOne.transferFrom(alice, bob, amount);
 
-        // Infinite allowance is preserved (matches the shielded path).
         assertEq(mYieldToOne.getShieldedAllowance(alice, carol), type(uint256).max);
     }
 
@@ -496,7 +496,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(alice);
         mYieldToOne.approve(carol, suint256(amount - 1));
 
-        // Allowance field zeroed in the revert payload — matches the shielded-balance precedent.
+        // Allowance is reported as 0 in the revert to avoid leaking the shielded value.
         vm.expectRevert(abi.encodeWithSelector(IERC20Extended.InsufficientAllowance.selector, carol, 0, amount));
 
         vm.prank(carol);
@@ -518,7 +518,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(pauser);
         mYieldToOne.pause();
 
-        // Pause is still enforced on the native path (routes through `_beforeTransfer`).
         vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
 
         vm.prank(carol);
@@ -546,9 +545,58 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.transferFrom(alice, bob, amount);
     }
 
+    function test_nativeTransferFrom_frozenRecipient() public {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+        mYieldToOne.setShieldedAllowance(alice, carol, amount);
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(carol, true);
+
+        vm.prank(freezeManager);
+        mYieldToOne.freeze(bob);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, amount);
+    }
+
+    function test_nativeTransferFrom_frozenCaller() public {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+        mYieldToOne.setShieldedAllowance(alice, carol, amount);
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(carol, true);
+
+        vm.prank(freezeManager);
+        mYieldToOne.freeze(carol);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, carol));
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, amount);
+    }
+
+    function test_nativeTransferFrom_delistedCallerReverts() public {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+        mYieldToOne.setShieldedAllowance(alice, carol, amount);
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(carol, true);
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(carol, false);
+
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, amount);
+    }
+
     function test_nativeTransferFrom_shieldedApproveSpentByNativePath() public {
-        // Cross-consistency: a shielded `approve(suint256)` is spendable by a native
-        // `transferFrom(uint256)` from an allowlisted caller — proves the single shared slot.
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
@@ -568,8 +616,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     }
 
     function test_nativeApprove_spentByShieldedTransferFrom() public {
-        // Cross-consistency (reverse): a native `approve(uint256)` to an allowlisted spender is
-        // spendable by the shielded `transferFrom(suint256)` — proves the single shared slot.
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
@@ -611,7 +657,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.getShieldedAllowance(alice, carol), 0);
     }
 
-    /* ============ balanceOf (gated read) ============ */
+    /* ============ balanceOf ============ */
 
     function test_balanceOf_holderCanRead() public {
         mYieldToOne.setBalanceOf(alice, 1_000e6);
@@ -631,8 +677,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     function test_balanceOf_swapFacilityCanRead() public {
         mYieldToOne.setBalanceOf(alice, 1_000e6);
 
-        // SwapFacility is exempted so M0 infra can observe extension balances along its
-        // operational paths without forcing a Seismic signed read.
         vm.prank(address(swapFacility));
         assertEq(mYieldToOne.balanceOf(alice), 1_000e6);
     }
@@ -640,8 +684,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     function test_balanceOf_allowlistedInfraCanReadAnyHolder() public {
         mYieldToOne.setBalanceOf(alice, 1_000e6);
 
-        // An allowlisted infra contract (e.g. LimitOrderProtocol) reads an arbitrary holder's
-        // cleartext balance to drive its operational paths.
         vm.prank(admin);
         mYieldToOne.setAllowlisted(carol, true);
 
@@ -665,7 +707,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(carol);
         assertEq(mYieldToOne.balanceOf(alice), 1_000e6);
 
-        // Removing the address from the allowlist re-blocks its read.
         vm.prank(admin);
         mYieldToOne.setAllowlisted(carol, false);
 
@@ -674,10 +715,9 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.balanceOf(alice);
     }
 
-    /* ============ allowance (gated read) ============ */
+    /* ============ allowance ============ */
 
     function test_allowance_unauthorized() public {
-        // alice approves bob; carol (third party) attempts to read → reverts.
         _installContractKey();
 
         vm.prank(alice);
@@ -804,6 +844,21 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.unwrap(alice, 1);
     }
 
+    function test_unwrap_insufficientBalance() external {
+        uint256 amount = 1_000e6;
+
+        mYieldToOne.setBalanceOf(address(swapFacility), amount - 1);
+        mYieldToOne.setTotalSupply(amount - 1);
+
+        // Balance is reported as 0 in the revert to avoid leaking the shielded value.
+        vm.expectRevert(
+            abi.encodeWithSelector(IMExtension.InsufficientBalance.selector, address(swapFacility), 0, amount)
+        );
+
+        vm.prank(address(swapFacility));
+        mYieldToOne.unwrap(alice, amount);
+    }
+
     function test_unwrap() external {
         uint256 amount = 1_000e6;
 
@@ -911,8 +966,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         _installContractKey();
 
-        // bob has no registered key => empty-ciphertext fallback emit (ciphertext assertions
-        // live in the encrypted-transfer tests below).
         vm.expectEmit(true, true, false, true);
         emit IMYieldToOne.Transfer(alice, bob, bytes(""));
 
@@ -929,16 +982,37 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         _installContractKey();
 
-        // Shielded comparison reverts with `balance = 0` (not the real balance) to avoid leak.
         vm.expectRevert(abi.encodeWithSelector(IMExtension.InsufficientBalance.selector, alice, 0, amount));
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(amount));
     }
 
+    function test_transfer_selfTransfer() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Transfer(alice, alice, bytes(""));
+
+        vm.prank(alice);
+        mYieldToOne.transfer(alice, suint256(amount));
+
+        assertEq(mYieldToOne.getBalanceOf(alice), amount);
+    }
+
+    function test_transfer_invalidRecipient() external {
+        mYieldToOne.setBalanceOf(alice, 1_000e6);
+
+        vm.expectRevert(abi.encodeWithSelector(IERC20Extended.InvalidRecipient.selector, address(0)));
+
+        vm.prank(alice);
+        mYieldToOne.transfer(address(0), suint256(1_000e6));
+    }
+
     function test_transfer_inheritedPathReverts() external {
-        // The IERC20 `transfer(address,uint256)` is overridden to revert at the entry point —
-        // no balance / freeze / pause state matters.
         vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
 
         vm.prank(alice);
@@ -977,8 +1051,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(alice);
         mYieldToOne.approve(carol, suint256(allowanceAmount));
 
-        // bob has not registered a public key, so the shielded entry point emits the
-        // bytes-variant Transfer overload with an empty ciphertext (empty-fallback branch).
         vm.expectEmit(true, true, false, true);
         emit IMYieldToOne.Transfer(alice, bob, bytes(""));
 
@@ -1002,7 +1074,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(carol);
         mYieldToOne.transferFrom(alice, bob, suint256(amount));
 
-        // Infinite allowance is preserved (matches ERC20ExtendedUpgradeable.transferFrom semantics).
         assertEq(mYieldToOne.getShieldedAllowance(alice, carol), type(uint256).max);
     }
 
@@ -1015,7 +1086,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(alice);
         mYieldToOne.approve(carol, suint256(amount - 1));
 
-        // Allowance field zeroed in the revert payload — matches the shielded-balance precedent.
         vm.expectRevert(abi.encodeWithSelector(IERC20Extended.InsufficientAllowance.selector, carol, 0, amount));
 
         vm.prank(carol);
@@ -1026,16 +1096,76 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
-        // No prior approve — shielded allowance is zero.
         vm.expectRevert(abi.encodeWithSelector(IERC20Extended.InsufficientAllowance.selector, carol, 0, amount));
 
         vm.prank(carol);
         mYieldToOne.transferFrom(alice, bob, suint256(amount));
     }
 
+    function test_transferFrom_insufficientBalance() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount - 1);
+        mYieldToOne.setShieldedAllowance(alice, carol, amount);
+
+        _installContractKey();
+
+        vm.expectRevert(abi.encodeWithSelector(IMExtension.InsufficientBalance.selector, alice, 0, amount));
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, suint256(amount));
+    }
+
+    function test_shieldedTransferFrom_spenderDelistedAfterApprove_stillSpends() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(carol, true);
+
+        vm.prank(alice);
+        mYieldToOne.approve(carol, amount);
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(carol, false);
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, suint256(amount));
+
+        assertEq(mYieldToOne.getBalanceOf(alice), 0);
+        assertEq(mYieldToOne.getBalanceOf(bob), amount);
+        assertEq(mYieldToOne.getShieldedAllowance(alice, carol), 0);
+    }
+
+    function testFuzz_transferFrom(
+        uint256 supply,
+        uint256 aliceBalance,
+        uint256 transferAmount,
+        bool infiniteAllowance
+    ) external {
+        supply = bound(supply, 1, type(uint240).max);
+        aliceBalance = bound(aliceBalance, 1, supply);
+        transferAmount = bound(transferAmount, 1, aliceBalance);
+        uint256 bobBalance = supply - aliceBalance;
+
+        if (bobBalance == 0) return;
+
+        mYieldToOne.setBalanceOf(alice, aliceBalance);
+        mYieldToOne.setBalanceOf(bob, bobBalance);
+        mYieldToOne.setShieldedAllowance(alice, carol, infiniteAllowance ? type(uint256).max : transferAmount);
+
+        _installContractKey();
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, suint256(transferAmount));
+
+        assertEq(mYieldToOne.getBalanceOf(alice), aliceBalance - transferAmount);
+        assertEq(mYieldToOne.getBalanceOf(bob), bobBalance + transferAmount);
+        assertEq(mYieldToOne.getShieldedAllowance(alice, carol), infiniteAllowance ? type(uint256).max : 0);
+    }
+
     function test_transferFrom_inheritedPathReverts() external {
-        // The IERC20 `transferFrom(address,address,uint256)` is overridden to revert at the
-        // entry point.
         vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
 
         vm.prank(carol);
@@ -1151,10 +1281,9 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.getBalanceOf(yieldRecipient), 500);
     }
 
-    /* ============ Encrypted Transfer Events — Helpers ============ */
+    /* ============ Helpers ============ */
 
-    /// @dev Canonical compressed-secp256k1 (33-byte) shape. Actual bytes are irrelevant here —
-    ///      the precompiles (0x65/0x68/0x66) are mocked; Seismic validates their semantics on devnet.
+    /// @dev Returns a 33-byte compressed-secp256k1-shaped public key; contents are arbitrary.
     function _validPubKey(bytes1 marker) internal pure returns (bytes memory) {
         bytes memory key = new bytes(33);
         key[0] = 0x02; // compressed-secp256k1 even-Y prefix
@@ -1164,21 +1293,14 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         return key;
     }
 
-    /// @dev Installs deterministic mocks for the three Seismic precompiles so the
-    ///      encrypted-emit pipeline can run end-to-end under plain `sforge`. The chosen
-    ///      return values are arbitrary but distinct, so tests can assert the contract
-    ///      forwards the precompile output as the event payload.
+    /// @dev Mocks the Seismic precompiles (0x65 ECDH, 0x68 HKDF, 0x66 AES-GCM) with distinct outputs.
     function _mockPrecompiles() internal {
-        // 0x65 ECDH → 32-byte shared secret.
         vm.mockCall(address(0x65), bytes(""), abi.encode(bytes32(uint256(1))));
-        // 0x68 HKDF → 32-byte AES-GCM key.
         vm.mockCall(address(0x68), bytes(""), abi.encode(bytes32(uint256(2))));
-        // 0x66 AES-GCM encrypt → opaque non-empty ciphertext.
         vm.mockCall(address(0x66), bytes(""), hex"deadbeefcafebabe");
     }
 
-    /// @dev Installs a contract keypair through the admin path. The actual private-key
-    ///      bytes are never observed externally (would require a Seismic signed read).
+    /// @dev Installs the contract keypair through the admin path.
     function _installContractKey() internal {
         vm.prank(admin);
         mYieldToOne.setContractKey(sbytes32(bytes32(uint256(0xC0FFEE))), _validPubKey(0xAA));
@@ -1199,7 +1321,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(admin);
         mYieldToOne.setContractKey(sbytes32(bytes32(uint256(0xC0FFEE))), _validPubKey(0xAA));
 
-        // Second call must revert — rotation is intentionally not supported.
         vm.expectRevert(IMYieldToOne.ContractKeyAlreadySet.selector);
 
         vm.prank(admin);
@@ -1244,6 +1365,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     function test_setContractKey_emitsContractKeySet() public {
         bytes memory pubKey = _validPubKey(0xAA);
 
+        assertEq(mYieldToOne.contractPublicKey(), bytes(""));
+
         vm.expectEmit();
         emit IMYieldToOne.ContractKeySet(pubKey);
 
@@ -1257,6 +1380,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
     function test_registerPublicKey_writesStorage() public {
         bytes memory pubKey = _validPubKey(0xBB);
+
+        assertEq(mYieldToOne.publicKeyOf(alice), bytes(""));
 
         vm.prank(alice);
         mYieldToOne.registerPublicKey(pubKey);
@@ -1273,8 +1398,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         assertEq(mYieldToOne.publicKeyOf(alice), firstKey);
 
-        // Re-registration overwrites — historical ciphertexts decrypt with the old key,
-        // future ciphertexts with the new one.
         vm.prank(alice);
         mYieldToOne.registerPublicKey(secondKey);
 
@@ -1317,7 +1440,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.registerPublicKey(_validPubKey(0xBB));
     }
 
-    /* ============ Shielded Transfer — Encrypted Emit (registered recipient) ============ */
+    /* ============ _encryptAmount ============ */
 
     function test_shieldedTransfer_registeredRecipient_emitsBytesPayload() external {
         uint256 amount = 1_000e6;
@@ -1337,10 +1460,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(amount));
 
-        // Counter incremented exactly once for the single encrypted emit.
         assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
 
-        // Locate the emitted bytes-variant Transfer log and assert shape.
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
         bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
@@ -1365,7 +1486,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertTrue(foundBytes, "missing Transfer(address,address,bytes) emit");
         assertFalse(foundPlaintext, "plaintext Transfer(uint256) emitted on shielded path");
 
-        // Balance updates still happen.
         assertEq(mYieldToOne.getBalanceOf(alice), 0);
         assertEq(mYieldToOne.getBalanceOf(bob), amount);
     }
@@ -1417,40 +1537,126 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertFalse(foundPlaintext, "plaintext Transfer(uint256) emitted on shielded path");
     }
 
-    /* ============ Shielded Transfer — Unregistered Recipient Fallback ============ */
+    function test_shieldedTransfer_ciphertextMatchesPrecompileOutput() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+    }
+
+    function test_shieldedTransfer_forwardsContractAndRecipientKeysToEcdh() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        bytes memory recipientKey = _validPubKey(0xBB);
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(recipientKey);
+
+        vm.expectCall(address(0x65), abi.encodePacked(bytes32(uint256(0xC0FFEE)), recipientKey));
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+    }
+
+    function test_shieldedTransfer_reregisteredKeyForwardedToEcdh() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        bytes memory firstKey = _validPubKey(0xBB);
+        bytes memory secondKey = _validPubKey(0xCC);
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(firstKey);
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(secondKey);
+
+        vm.expectCall(address(0x65), abi.encodePacked(bytes32(uint256(0xC0FFEE)), firstKey), 0);
+        vm.expectCall(address(0x65), abi.encodePacked(bytes32(uint256(0xC0FFEE)), secondKey), 1);
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+    }
+
+    function test_shieldedTransfer_zeroAmount_registeredRecipient() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(0));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
+        assertEq(mYieldToOne.getBalanceOf(alice), amount);
+        assertEq(mYieldToOne.getBalanceOf(bob), 0);
+    }
 
     function test_shieldedTransfer_unregisteredRecipient_emitsEmptyBytesAndSucceeds() external {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
-        // Contract key IS set — the key check fires BEFORE the unregistered-recipient
-        // fallback, so the fallback is only reachable post-key.
+        // Key IS set: the ContractKeyNotSet check fires before the unregistered-recipient fallback.
         _installContractKey();
 
-        // bob is intentionally NOT registered; precompiles intentionally NOT mocked — the
-        // fallback path must not call any of them.
-
+        // Precompiles are intentionally not mocked: the fallback path must not call them.
         vm.expectEmit(true, true, false, true);
         emit IMYieldToOne.Transfer(alice, bob, bytes(""));
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(amount));
 
-        // Counter does NOT increment on the empty-bytes fallback (saves an SSTORE).
         assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
 
-        // Balances still update.
         assertEq(mYieldToOne.getBalanceOf(alice), 0);
         assertEq(mYieldToOne.getBalanceOf(bob), amount);
     }
 
-    /* ============ Shielded Transfer — Contract Key Not Set ============ */
+    function test_shieldedTransfer_zeroAmount_unregisteredRecipient() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Transfer(alice, bob, bytes(""));
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(0));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
+        assertEq(mYieldToOne.getBalanceOf(alice), amount);
+        assertEq(mYieldToOne.getBalanceOf(bob), 0);
+    }
 
     function test_shieldedTransfer_contractKeyNotSet_reverts() external {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
-        // Recipient IS registered but contract keypair is NOT installed → revert.
         vm.prank(bob);
         mYieldToOne.registerPublicKey(_validPubKey(0xBB));
 
@@ -1464,13 +1670,117 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
+        // Reverts even for an unregistered recipient so success cannot leak who is registered.
         vm.expectRevert(IMYieldToOne.ContractKeyNotSet.selector);
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+
+        assertEq(mYieldToOne.getBalanceOf(alice), amount);
+        assertEq(mYieldToOne.getBalanceOf(bob), 0);
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
+    }
+
+    /* ============ _ecdh / _hkdf / _aesGcmEncrypt ============ */
+
+    function test_shieldedTransfer_ecdhPrecompileFails() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.mockCallRevert(address(0x65), bytes(""), bytes(""));
+
+        vm.expectRevert(abi.encodeWithSelector(IMYieldToOne.PrecompileFailed.selector, address(0x65)));
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(amount));
     }
 
-    /* ============ Shielded Approve — Encrypted Emit ============ */
+    function test_shieldedTransfer_hkdfPrecompileFails() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.mockCall(address(0x65), bytes(""), abi.encode(bytes32(uint256(1))));
+        vm.mockCallRevert(address(0x68), bytes(""), bytes(""));
+
+        vm.expectRevert(abi.encodeWithSelector(IMYieldToOne.PrecompileFailed.selector, address(0x68)));
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+    }
+
+    function test_shieldedTransfer_aesGcmPrecompileFails() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.mockCall(address(0x65), bytes(""), abi.encode(bytes32(uint256(1))));
+        vm.mockCall(address(0x68), bytes(""), abi.encode(bytes32(uint256(2))));
+        vm.mockCallRevert(address(0x66), bytes(""), bytes(""));
+
+        vm.expectRevert(abi.encodeWithSelector(IMYieldToOne.PrecompileFailed.selector, address(0x66)));
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+    }
+
+    function test_shieldedApprove_ecdhPrecompileFails() external {
+        _installContractKey();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.mockCallRevert(address(0x65), bytes(""), bytes(""));
+
+        vm.expectRevert(abi.encodeWithSelector(IMYieldToOne.PrecompileFailed.selector, address(0x65)));
+
+        vm.prank(alice);
+        mYieldToOne.approve(bob, suint256(1_000e6));
+    }
+
+    /* ============ encryptedEventNonce ============ */
+
+    function test_encryptedEventNonce_sharedAcrossTransferAndApprove() external {
+        mYieldToOne.setBalanceOf(alice, 3_000e6);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(1_000e6));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
+
+        vm.prank(alice);
+        mYieldToOne.approve(bob, suint256(500e6));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 2);
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(1_000e6));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 3);
+    }
+
+    /* ============ _shieldedApprove ============ */
 
     function test_shieldedApprove_registeredSpender_emitsBytesPayload() external {
         uint256 amount = 1_000e6;
@@ -1588,11 +1898,9 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertFalse(foundBytes, "infra path leaked into encrypted-bytes Approval overload");
     }
 
-    /* ============ Dual-Emit Regression — Infra transferFrom stays plaintext ============ */
+    /* ============ _shieldedTransfer (plaintext emit) ============ */
 
     function test_nativeTransferFrom_registeredRecipient_emitsPlaintextOnly() external {
-        // Regression: infra-gated native `transferFrom` MUST stay on the plaintext Transfer
-        // overload even when the recipient has a registered key.
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
@@ -1612,7 +1920,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(address(swapFacility));
         mYieldToOne.transferFrom(alice, bob, amount);
 
-        // Encrypted path was never entered.
         assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -1640,11 +1947,9 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertFalse(foundBytes, "infra path leaked into encrypted-bytes Transfer overload");
     }
 
-    /* ============ Dual-Emit Regression — Mint / Burn stay plaintext ============ */
+    /* ============ _mint / _burn ============ */
 
     function test_mint_emitsPlaintextOnly() external {
-        // _mint via SwapFacility.wrap MUST stay on the plaintext Transfer overload (bridge amounts
-        // are public) even with a contract key + recipient pubkey registered.
         uint256 amount = 1_000e6;
         mToken.setBalanceOf(address(swapFacility), amount);
 
@@ -1661,7 +1966,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(address(swapFacility));
         mYieldToOne.wrap(alice, amount);
 
-        // Counter untouched: mint never enters the encrypted-emit path.
         assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -1677,7 +1981,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
             if (logs[i].topics[0] == bytesTopic) {
                 foundBytes = true;
             } else if (logs[i].topics[0] == plaintextTopic) {
-                // Mint: from == address(0).
                 if (address(uint160(uint256(logs[i].topics[1]))) == address(0)) {
                     foundPlaintextMint = true;
                     assertEq(address(uint160(uint256(logs[i].topics[2]))), alice);
@@ -1691,8 +1994,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     }
 
     function test_burn_emitsPlaintextOnly() external {
-        // _burn via SwapFacility.unwrap MUST stay on the plaintext Transfer overload even with a
-        // contract key + (notional) recipient pubkey registered.
         uint256 amount = 1_000e6;
 
         mYieldToOne.setBalanceOf(address(swapFacility), amount);
@@ -1703,8 +2004,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         _installContractKey();
         _mockPrecompiles();
 
-        // Register a pubkey for swapFacility to prove burn isn't routed through the encrypted
-        // path even when the source address has a registered key.
+        // swapFacility registers a key to prove burn still bypasses the encrypted path.
         vm.prank(address(swapFacility));
         mYieldToOne.registerPublicKey(_validPubKey(0xCC));
 
@@ -1715,7 +2015,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(address(swapFacility));
         mYieldToOne.unwrap(alice, amount);
 
-        // Counter untouched.
         assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -1731,7 +2030,6 @@ contract MYieldToOneUnitTests is BaseUnitTest {
             if (logs[i].topics[0] == bytesTopic) {
                 foundBytes = true;
             } else if (logs[i].topics[0] == plaintextTopic) {
-                // Burn: to == address(0).
                 if (address(uint160(uint256(logs[i].topics[2]))) == address(0)) {
                     foundPlaintextBurn = true;
                     assertEq(address(uint160(uint256(logs[i].topics[1]))), address(swapFacility));
