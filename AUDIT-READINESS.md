@@ -4,13 +4,13 @@ Branch under review: `feat/seismic` (standalone, never merges to `main`).
 Work branch for all changes: `seismic-audit-readiness` (cut from `feat/seismic` at `0456c6e`).
 Produced 2026-06-11 by a 8-agent analysis workflow (6 deep-dive dimensions + adversarial verification + completeness critic); every load-bearing claim below was independently re-verified (on-chain reads, reproduced test runs, reproduced build failures).
 
-## Status — Wave 1 executed (2026-06-11)
+## Status — Wave 1 executed, Wave 2 in flight (2026-06-11)
 
 Decisions taken: **JMIExtension in audit scope** (tests fixed + re-enabled); **encrypted `Approval(bytes)` overload** on the shielded approve path (native infra approve stays plaintext); **balanceOf gate extended** to `FREEZE_MANAGER_ROLE` (and `FORCED_TRANSFER_MANAGER_ROLE` on the FT subclass); **bootstrap window closed by check-reordering** (`ContractKeyNotSet` before the unregistered fallback — the initializer fold was rejected because initialize calldata travels in plaintext inside the CreateX proxy deploy and would leak the private key).
 
 Done (P1 fixes, P2 sweep, P3.1–P3.5/P3.7 tests, P4 tooling/CI, P5.1–P5.5 scripts/docs, P6.1–P6.7/P6.9 package): see the branch history. Full unit suite 468/468 green incl. JMI 59/59; all deployables under EIP-170 (JMI margin 1,040 B).
 
-Remaining (Wave 2): run `set-contract-key` + `configure-extension` against the live testnet proxy (needs admin key + go-ahead); P3.6 Seismic devnet/testnet integration suite + off-chain decryptor; AUDIT-SCOPE.md TODOs (frozen tag, mainnet custody decisions); P6.8 monitoring/indexer confirmation; optional keypair derive-and-compare check in `setContractKey`.
+Wave 2 (executed 2026-06-11/12): P3.6 landed — in-process Seismic integration suite (11 tests, real precompiles, no mocks), sanvil E2E (TxSeismic 0x4A key install, signed-read gating, off-chain decryption of a real on-chain event), `script/decrypt-transfer-event.py` (pure-stdlib, vector-pinned), read-only live-testnet checker, and the `reports/` evidence pack (yieldToOne contracts 100% line/branch/function coverage). On-chain: `configure-extension` executed (extension approved, Portal allowlisted; LimitOrderProtocol added later via the same target — not yet deployed on 5124). **Still pending**: `set-contract-key-seismic-testnet` (user hold — griefing window open until run; commands in RUNBOOK.md), the live-testnet shielded-transfer smoke after the key lands, frozen tag (`audit/seismic-v1`), mainnet custody (AUDIT-SCOPE.md trust-model TODOs), Envio/indexer confirmation for the `bytes`-overload events (P6.8), and the optional keypair derive-and-compare hardening in `setContractKey`.
 
 ---
 

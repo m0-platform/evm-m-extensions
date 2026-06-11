@@ -5,16 +5,25 @@ Toolchain: `source scripts/seismic-env.sh` (sforge/scast/ssolc on PATH); `.env` 
 
 ## Post-deploy chain (once per derived extension instance)
 
-Run in order — USDS (chain 5124) is done through step 1; JMIExtension and any future instance need all four.
+Run in order — for USDS (chain 5124) steps 1, 2 and 4 are done and step 3 is pending (see below); JMIExtension and any future instance need all four.
 
 1. **Deploy + verify**: `make deploy-yield-to-one-forced-transfer-seismic-testnet`
    (broadcasts, then auto-verifies every contract on socialscan via `script/verify-seismic.py`).
 2. **Configure**: `make configure-extension-seismic-testnet`
-   (env: `EXTENSION_PROXY`, `PORTAL`, `LIMIT_ORDER_PROTOCOL`; runs `script/ConfigureSeismicExtension.s.sol` — approves the extension on SwapFacility and allowlists the infra contracts).
+   (env: `EXTENSION_PROXY`, `PORTAL`, optional `LIMIT_ORDER_PROTOCOL`; runs `script/ConfigureSeismicExtension.s.sol` — approves the extension on SwapFacility and allowlists the infra contracts).
+   LimitOrderProtocol is not yet deployed on 5124: leave `LIMIT_ORDER_PROTOCOL` unset for a Portal-only allowlist, then rerun the same target with it set once deployed — both setters no-op on already-set values.
 3. **Install the contract key**: `make set-contract-key-seismic-testnet`
    (env: `EXTENSION_PROXY`; runs `script/set-contract-key.sh`).
    **MUST run BEFORE any user onboarding**: `registerPublicKey` is permissionless, and shielded transfers to a registered recipient revert `ContractKeyNotSet` until the key is installed — an open griefing window. One-shot, no rotation; fresh keypair per instance; archive both keys in 1Password (see the script header for why this is a shell script and not a forge script).
 4. **Commit the record**: `deployments/<chainId>.json` + `broadcast/<DeployScript>.s.sol/<chainId>/run-*.json`.
+
+**Status (USDS)**: step 2 executed 2026-06-11 (broadcast committed; on-chain: extension approved on SwapFacility, Portal allowlisted). Step 3 is scripted but **pending** — the contract key is unset and the `registerPublicKey` griefing window stays open until it runs:
+
+```bash
+make set-contract-key-seismic-testnet EXTENSION_PROXY=0xb3b2f21f9a6a5d698D9178986Fa4148260B5d018
+```
+
+Check live state any time with `make check-live-seismic-testnet` (read-only).
 
 ## registerPublicKey
 
@@ -29,6 +38,7 @@ End-user concern, owned by the dapp/SDK — a plain tx (the public key is public
 | ProxyAdmin | `0x3471d21118f19bfdb84591a92c82546c74f2f321` |
 | SwapFacility | `0xB6807116b3B1B321a390594e31ECD6e0076f6278` |
 | M token | `0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b` |
+| Portal (SpokePortal) | `0xD925C84b55E4e44a53749fF5F2a5A13F63D128fd` |
 | Admin / deployer (all roles + ProxyAdmin owner) | `0x12b1A4226ba7D9Ad492779c924b0fC00BDCb6217` |
 
 Deploy txs (2026-06-05, commit `2cb7a6c`): implementation `0x6b2a685a27be27965f1c1f370693388cb6d1a57a314738804b0f642bf0150c5f` (block 15161974), CreateX `deployCreate3` for proxy + ProxyAdmin `0x248bb6469df2f154784da5ac647b62e806e94d65793e1e42081f5de60cc39eee` (block 15161982).

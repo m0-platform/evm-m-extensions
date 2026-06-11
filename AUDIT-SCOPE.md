@@ -101,9 +101,20 @@ branches — **TODO: freeze exact submodule SHAs at handoff**).
 | -------- | -------------- | ------ | ----- |
 | M Token | `0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b` | `m0-foundation/protocol` (via suite deployment) | Out |
 | SwapFacility | `0xB6807116b3B1B321a390594e31ECD6e0076f6278` | this repo, `src/swap/SwapFacility.sol` (source pragma-only vs `main`) | Out as source; ssolc-recompiled bytecode caveat applies |
-| Portal (SpokePortal) | `0xD925C84b55E4e44a53749fF5F2a5A13F63D128fd` | `m0-foundation/m-portal-v2` (via suite deployment) | Out |
-| LimitOrderProtocol | TODO — not yet deployed/allowlisted on 5124 | TODO: repo + commit | Out |
+| Portal (SpokePortal) | `0xD925C84b55E4e44a53749fF5F2a5A13F63D128fd` | `m0-foundation/m-portal-v2`, deployed via the suite deployment above (pinned in its `deployments/5124.json`) | Out |
+| LimitOrderProtocol | TODO — not yet deployed on 5124 (allowlisting deferred; see note below) | TODO: repo + commit | Out |
 | CreateX | `0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed` | canonical CreateX factory (`pcaversaccio/createx`) | Out (deploy infra only) |
+
+The suite deployment's `deployments/5124.json` also records the rest of the 5124 stack:
+registrar `0x119FbeeDD4F4f4298Fb59B720d5654442b81ae2c`, Hyperlane bridge
+`0xfCc1d596Ad6cAb0b5394eAa447d8626813180f32`, wrapped M
+`0x437cc33344a0B27A429f795ff6B469C72698B291` — none are direct dependencies of the
+in-scope contracts.
+
+`script/ConfigureSeismicExtension.s.sol` treats LimitOrderProtocol as optional
+(`LIMIT_ORDER_PROTOCOL` unset ⇒ Portal-only allowlist at first configure); once deployed
+it is added by rerunning the same `make configure-extension-seismic-testnet` target (both
+setters no-op on already-set values).
 
 ## Trust model / roles
 
