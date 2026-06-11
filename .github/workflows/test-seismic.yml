@@ -53,5 +53,8 @@ jobs:
       - name: Run unit tests (seismic profile)
         run: make tests profile=seismic
 
+      - name: Run in-process Seismic integration suite (real precompiles)
+        run: make integration-seismic profile=seismic
+
       - name: Check contract sizes (EIP-170)
         run: make sizes profile=seismic

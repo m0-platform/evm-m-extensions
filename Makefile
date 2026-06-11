@@ -60,6 +60,20 @@ integration:
 	fi
 	SEISMIC_DEVNET_RPC_URL=$(SEISMIC_DEVNET_RPC_URL) FOUNDRY_NO_MATCH_PATH='no_match_nothing/**' ./test.sh -d test/integration -p $(profile)
 
+# In-process Seismic integration suite (real precompiles, no node needed).
+integration-seismic:
+	$(require-toolchain)
+	FOUNDRY_NO_MATCH_PATH='no_match_nothing/**' FOUNDRY_PROFILE=$(profile) $(FORGE_BIN) test --match-path 'test/integration/seismic/*' -vv
+
+# Full sanvil E2E: TxSeismic key install, signed-read gating, off-chain decryption.
+e2e-sanvil:
+	$(require-toolchain)
+	bash test/integration/seismic/run-sanvil-e2e.sh
+
+# Read-only status checklist against the live chain-5124 deployment.
+check-live-seismic-testnet:
+	bash test/integration/seismic/check-live-testnet.sh
+
 coverage:
 	$(require-toolchain)
 	FOUNDRY_PROFILE=$(profile) $(FORGE_BIN) coverage --report lcov && lcov --extract lcov.info -o lcov.info 'src/*' --ignore-errors inconsistent && genhtml lcov.info -o coverage
