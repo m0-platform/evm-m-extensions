@@ -1,0 +1,6 @@
+{
+  "extensionAddresses": ["0xb3b2f21f9a6a5d698D9178986Fa4148260B5d018"],
+  "extensionNames": ["Seismic Dollar"],
+  "swapAdapter": "0x0000000000000000000000000000000000000000",
+  "swapFacility": "0xB6807116b3B1B321a390594e31ECD6e0076f6278"
+}
