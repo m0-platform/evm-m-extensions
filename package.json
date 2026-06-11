@@ -15,23 +15,18 @@
   "scripts": {
     "build": "make -B build",
     "clean": "make -B clean",
-    "compile": "forge compile",
     "coverage": "make -B coverage",
-    "deploy-local": "make -B deploy-local",
-    "deploy-sepolia": "make -B deploy-sepolia",
-    "doc": "forge doc --serve --port 4000",
     "lint-staged": "lint-staged",
     "prepack": "npm run clean && npm run build",
     "prepare": "husky",
     "prettier": "prettier --write 'src/**/*.sol' 'test/**/*.sol' 'script/**/*.sol'",
-    "slither": "forge build --build-info --skip '*/test/**' --skip '*/script/**' --force && slither --compile-force-framework foundry --ignore-compile --config-file slither.config.json --fail-high .",
+    "slither": "make -B slither",
     "solhint": "solhint -f stylish 'src/**/*.sol'",
     "solhint-fix": "solhint --fix 'src/**/*.sol'",
     "test": "make -B tests",
     "test-gas": "make -B gas-report",
     "test-fuzz": "make -B fuzz",
-    "test-integration": "make -B integration",
-    "test-invariant": "make -B invariant"
+    "test-integration": "make -B integration"
   },
   "devDependencies": {
     "husky": "9.1.7",

@@ -1,35 +1,14 @@
 #!/usr/bin/env bash
-# Seismic toolchain environment — sources sforge / ssolc / sanvil from a
-# repo-local install at .seismic-toolchain/ (git-ignored).
+# Seismic toolchain env — puts the repo-local sforge/ssolc/sanvil install at .seismic-toolchain/ (git-ignored) on PATH.
 #
-# USAGE
-#   From the repo root in any bash/zsh shell:
-#       source scripts/seismic-env.sh
-#   After sourcing, `sforge`, `ssolc`, and `sanvil` resolve to the repo-local
-#   binaries. The export survives until the shell exits.
+# Usage:  source scripts/seismic-env.sh
+#         (any bash/zsh shell; lasts until the shell exits; sforge auto-uses FOUNDRY_PROFILE=seismic)
 #
-# FIRST-TIME INSTALL
-#   1. source scripts/seismic-env.sh
-#   2. curl -L -H "Accept: application/vnd.github.v3.raw" \
-#        "https://api.github.com/repos/SeismicSystems/seismic-foundry/contents/sfoundryup/install?ref=seismic" | bash
-#      The installer writes sfoundryup to $FOUNDRY_DIR/bin/sfoundryup.
-#   3. sfoundryup
-#      Fetches sforge / ssolc / sanvil into $FOUNDRY_DIR/bin.
-#   4. sforge --version && ssolc --version && sanvil --version
-#
-# NOTES
-# - FOUNDRY_DIR is the env var the Seismic installer honors. Pointing it at
-#   the repo-local path overrides the default of "$HOME/.seismic".
-# - Pre-prepending $FOUNDRY_DIR/bin to PATH causes the installer's rc-edit
-#   check to find the bin dir already on PATH and skip mutating ~/.zshenv
-#   on most versions of the upstream script. If a future installer revision
-#   still appends an export line, remove it from ~/.zshenv by hand — the
-#   binaries continue to work via this sourced env.
-# - Coexists with stock Foundry: `forge` (stock) and `sforge` (Seismic) live
-#   in different bin dirs and have different names — no collisions.
+# Install:  1. source scripts/seismic-env.sh
+#           2. curl -L -H "Accept: application/vnd.github.v3.raw" "https://api.github.com/repos/SeismicSystems/seismic-foundry/contents/sfoundryup/install?ref=seismic" | bash
+#           3. sfoundryup   (fetches sforge/ssolc/sanvil into $FOUNDRY_DIR/bin; check with sforge --version)
 
-# Resolve repo root from this script's own path (works whether sourced from
-# repo root, from a subdir, or from $PATH after `chmod +x`).
+# Resolve repo root from this script's own path (works when sourced from any cwd).
 __SEISMIC_ENV_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 SEISMIC_REPO_ROOT="$(cd "$__SEISMIC_ENV_SH_DIR/.." && pwd)"
 
@@ -42,11 +21,7 @@ case ":$PATH:" in
     *) export PATH="$FOUNDRY_BIN_DIR:$PATH" ;;
 esac
 
-# Shell function that pins FOUNDRY_PROFILE=seismic for sforge invocations so
-# `evm_version = "mercury"` (required for shielded types) is applied without
-# the caller having to remember the flag. `forge` (stock) is untouched and
-# continues using the default profile + cancun.
-# Override per-call with `FOUNDRY_PROFILE=default sforge ...` if needed.
+# Pin FOUNDRY_PROFILE=seismic for sforge (mercury EVM, shielded types); stock `forge` is untouched; override per-call with `FOUNDRY_PROFILE=default sforge ...`.
 sforge() {
     FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-seismic}" command sforge "$@"
 }
