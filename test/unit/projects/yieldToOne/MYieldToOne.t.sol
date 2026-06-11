@@ -630,6 +630,13 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.balanceOf(alice), 1_000e6);
     }
 
+    function test_balanceOf_freezeManagerCanRead() public {
+        mYieldToOne.setBalanceOf(alice, 1_000e6);
+
+        vm.prank(freezeManager);
+        assertEq(mYieldToOne.balanceOf(alice), 1_000e6);
+    }
+
     function test_balanceOf_removingFromAllowlistReblocks() public {
         mYieldToOne.setBalanceOf(alice, 1_000e6);
 

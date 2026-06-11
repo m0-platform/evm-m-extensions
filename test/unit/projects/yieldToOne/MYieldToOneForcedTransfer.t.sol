@@ -397,6 +397,51 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         assertEq(mYieldToOneForcedTransfer.balanceOf(alice), 1_000e6);
     }
 
+    /* ============ balanceOf (gated read) ============ */
+
+    function test_balanceOf_freezeManagerCanRead() public {
+        mYieldToOneForcedTransfer.setBalanceOf(alice, 1_000e6);
+
+        vm.prank(freezeManager);
+        assertEq(mYieldToOneForcedTransfer.balanceOf(alice), 1_000e6);
+    }
+
+    function test_balanceOf_forcedTransferManagerCanRead() public {
+        mYieldToOneForcedTransfer.setBalanceOf(alice, 1_000e6);
+
+        vm.prank(forcedTransferManager);
+        assertEq(mYieldToOneForcedTransfer.balanceOf(alice), 1_000e6);
+    }
+
+    function test_balanceOf_unauthorized() public {
+        mYieldToOneForcedTransfer.setBalanceOf(alice, 1_000e6);
+
+        vm.expectRevert(IMYieldToOne.Unauthorized.selector);
+        vm.prank(bob);
+        mYieldToOneForcedTransfer.balanceOf(alice);
+    }
+
+    function test_forceTransfer_seizureSizedByBalanceOf() public {
+        mYieldToOneForcedTransfer.setBalanceOf(alice, 1_000e6);
+
+        vm.prank(freezeManager);
+        mYieldToOneForcedTransfer.freeze(alice);
+
+        vm.prank(forcedTransferManager);
+        uint256 seized = mYieldToOneForcedTransfer.balanceOf(alice);
+
+        assertEq(seized, 1_000e6);
+
+        vm.prank(forcedTransferManager);
+        mYieldToOneForcedTransfer.forceTransfer(alice, bob, seized);
+
+        vm.prank(forcedTransferManager);
+        assertEq(mYieldToOneForcedTransfer.balanceOf(alice), 0);
+
+        vm.prank(forcedTransferManager);
+        assertEq(mYieldToOneForcedTransfer.balanceOf(bob), seized);
+    }
+
     /* ============ claimYield ============ */
 
     function test_claimYield_noYield() external {

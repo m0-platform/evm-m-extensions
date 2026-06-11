@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.26;
 
+import { IERC20 } from "../../../lib/common/src/interfaces/IERC20.sol";
+
 import { IMYieldToOne } from "./interfaces/IMYieldToOne.sol";
 
 import { MYieldToOne } from "./MYieldToOne.sol";
@@ -107,6 +109,16 @@ contract MYieldToOneForcedTransfer is MYieldToOne, ForcedTransferable {
      */
     function setYieldRecipient(address account) external override onlyRole(YIELD_RECIPIENT_MANAGER_ROLE) {
         _setYieldRecipient(account);
+    }
+
+    /* ============ View/Pure Functions ============ */
+
+    /// @inheritdoc IERC20
+    /// @dev Additionally readable by FORCED_TRANSFER_MANAGER_ROLE holders (compliance must size seizures).
+    function balanceOf(address account) public view override returns (uint256) {
+        if (hasRole(FORCED_TRANSFER_MANAGER_ROLE, msg.sender)) return uint256(_balanceOf(account));
+
+        return super.balanceOf(account);
     }
 
     /* ============ Internal Interactive Functions ============ */

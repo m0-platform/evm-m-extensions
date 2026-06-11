@@ -283,9 +283,13 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
 
     /// @inheritdoc IERC20
     /// @dev Shielded read, gated to `account` (TxSeismic 0x4A signed read — plain eth_call zeroes
-    ///      msg.sender and reverts) or trusted infra (`_isInfra`). Not readable by arbitrary callers.
-    function balanceOf(address account) public view override returns (uint256) {
-        if (msg.sender != account && !_isInfra(msg.sender)) revert Unauthorized();
+    ///      msg.sender and reverts), trusted infra (`_isInfra`), or FREEZE_MANAGER_ROLE holders
+    ///      (compliance must size seizures). Not readable by arbitrary callers.
+    function balanceOf(address account) public view virtual override returns (uint256) {
+        if (msg.sender != account && !_isInfra(msg.sender) && !hasRole(FREEZE_MANAGER_ROLE, msg.sender)) {
+            revert Unauthorized();
+        }
+
         return uint256(_getMYieldToOneStorageLocation().balanceOf[account]);
     }
 
