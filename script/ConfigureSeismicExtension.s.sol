@@ -22,9 +22,12 @@ contract ConfigureSeismicExtension is ScriptBase {
         address extension = vm.envAddress("EXTENSION_PROXY");
         address swapFacility = _getSwapFacility();
 
-        address[] memory infra = new address[](2);
+        // LIMIT_ORDER_PROTOCOL is optional: not yet deployed on Seismic testnet (see AUDIT-SCOPE.md).
+        address limitOrderProtocol = vm.envOr("LIMIT_ORDER_PROTOCOL", address(0));
+
+        address[] memory infra = new address[](limitOrderProtocol == address(0) ? 1 : 2);
         infra[0] = vm.envAddress("PORTAL");
-        infra[1] = vm.envAddress("LIMIT_ORDER_PROTOCOL");
+        if (limitOrderProtocol != address(0)) infra[1] = limitOrderProtocol;
 
         vm.startBroadcast(deployer);
 
@@ -35,6 +38,6 @@ contract ConfigureSeismicExtension is ScriptBase {
 
         console.log("Extension approved on SwapFacility:", extension);
         console.log("Allowlisted Portal:", infra[0]);
-        console.log("Allowlisted LimitOrderProtocol:", infra[1]);
+        if (limitOrderProtocol != address(0)) console.log("Allowlisted LimitOrderProtocol:", limitOrderProtocol);
     }
 }
