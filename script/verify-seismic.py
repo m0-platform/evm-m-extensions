@@ -2,34 +2,11 @@
 """
 Auto-verify every contract from a Seismic (mercury/ssolc) deploy broadcast.
 
-WHY THIS EXISTS
-    Inline `sforge script --verify` can't verify mercury builds: the socialscan
-    explorer rejects `evmVersion: mercury` in the standard-json and wants the
-    compiler labelled `v0.8.31+commit.cd9163d8` (no `-develop.<date>` tag), and
-    forge offers no flag to strip evmVersion on the script-verify path. This
-    script does what forge can't: it reconstructs the EXACT ssolc standard-json
-    from the local build artifacts, drops evmVersion, fixes the compiler label,
-    and submits each deployed contract to the explorer's etherscan-style API.
-
-WHAT IT DOES
-    1. Reads the newest broadcast run for a deploy script + chain id.
-    2. Discovers every deployed contract (direct CREATEs + factory/CreateX
-       additionalContracts) and identifies each by matching its on-chain
-       creation code against the compiled bytecode in out/build-info/*.json
-       (no name list to maintain — it's all bytecode-derived).
-    3. For each match, builds the minimal standard-json (import closure only),
-       removes settings.evmVersion, derives constructor args from the init code,
-       and POSTs verifysourcecode. Contracts whose bytecode isn't ours (e.g. the
-       CreateX internal proxy) are skipped and logged.
-
-    Optimizer runs / viaIR are read from the build-info, NOT hardcoded, so this
-    works across repos with different seismic profiles (e.g. runs=200 + via-ir).
-
-REQUIREMENTS
-    - `out/build-info/*.json` must be the FULL build-info (input + output). Enable
-      with `build_info = true` in foundry.toml, and run this right after the
-      seismic deploy so out/ matches what was deployed.
-    - python3 + jq. No ssolc/sforge needed.
+Forge can't verify mercury builds (the explorer rejects `evmVersion: mercury` and wants the
+compiler labelled `v0.8.31+commit.cd9163d8`), so this rebuilds the exact ssolc standard-json
+from out/build-info (closure only, evmVersion dropped), matches each deployed address by
+creation bytecode, derives constructor args from the init code, and POSTs verifysourcecode.
+Needs python3 + jq and FULL build-info (`build_info = true`), fresh from the deploy build.
 
 USAGE
     python3 script/verify-seismic.py <DeployScript.s.sol> <chain_id> [--dry-run]
