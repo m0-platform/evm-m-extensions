@@ -171,7 +171,9 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         sbytes32 privateKey,
         bytes calldata publicKey
     ) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (publicKey.length != 33) revert InvalidPublicKeyLength();
+        _revertIfInvalidPublicKey(publicKey);
+
+        if (bytes32(privateKey) == bytes32(0)) revert ZeroPrivateKey();
 
         MYieldToOneStorageStruct storage $ = _getMYieldToOneStorageLocation();
 
@@ -186,7 +188,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
 
     /// @inheritdoc IMYieldToOne
     function registerPublicKey(bytes calldata publicKey) external virtual {
-        if (publicKey.length != 33) revert InvalidPublicKeyLength();
+        _revertIfInvalidPublicKey(publicKey);
 
         _getMYieldToOneStorageLocation().publicKeys[msg.sender] = publicKey;
 
@@ -580,6 +582,15 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
      */
     function _isInfra(address account) internal view returns (bool) {
         return account == swapFacility || _getMYieldToOneStorageLocation().allowlist[account];
+    }
+
+    /**
+     * @dev   Reverts unless `publicKey` is a 33-byte compressed secp256k1 point (`0x02`/`0x03` prefix).
+     * @param publicKey The public key being validated.
+     */
+    function _revertIfInvalidPublicKey(bytes calldata publicKey) internal pure {
+        if (publicKey.length != 33) revert InvalidPublicKeyLength();
+        if (publicKey[0] != 0x02 && publicKey[0] != 0x03) revert InvalidPublicKeyPrefix();
     }
 
     /**

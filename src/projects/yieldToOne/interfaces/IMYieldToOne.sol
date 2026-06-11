@@ -89,6 +89,13 @@ interface IMYieldToOne {
     ///         key is not exactly 33 bytes (compressed secp256k1 encoding).
     error InvalidPublicKeyLength();
 
+    /// @notice Reverted by `setContractKey` / `registerPublicKey` if the supplied public
+    ///         key does not start with a compressed-point prefix (`0x02` / `0x03`).
+    error InvalidPublicKeyPrefix();
+
+    /// @notice Reverted by `setContractKey` if the supplied private key is zero.
+    error ZeroPrivateKey();
+
     /// @notice Reverted by `setContractKey` if the contract keypair has already been
     ///         installed. Rotation is deliberately not supported — a new key would orphan
     ///         every historical ciphertext.
@@ -180,8 +187,10 @@ interface IMYieldToOne {
      * @dev    MUST be sent as a Seismic `TxSeismic` transaction (type `0x4A`) so the
      *         private key is encrypted in calldata. This is an operational requirement
      *         that cannot be enforced from Solidity.
-     * @dev    Reverts `InvalidPublicKeyLength` unless `publicKey.length == 33`
-     *         (compressed secp256k1 encoding).
+     * @dev    Reverts `InvalidPublicKeyLength` unless `publicKey.length == 33` and
+     *         `InvalidPublicKeyPrefix` unless `publicKey[0]` is `0x02` / `0x03`.
+     * @dev    Reverts `ZeroPrivateKey` if `privateKey` is zero (a zero key would bypass
+     *         the one-shot guard and leave the contract key-less).
      * @dev    Rotation is intentionally out of scope: rotating the contract key would
      *         orphan every historical ciphertext stored in past events.
      * @param  privateKey The contract's secp256k1 private key, shielded at the ABI
@@ -194,7 +203,8 @@ interface IMYieldToOne {
      * @notice Registers the caller's recipient public key. Idempotent — a subsequent call
      *         overwrites the previously registered key (future ciphertexts use the new
      *         key; historical ciphertexts remain decryptable only with the old key).
-     * @dev    Reverts `InvalidPublicKeyLength` unless `publicKey.length == 33`.
+     * @dev    Reverts `InvalidPublicKeyLength` unless `publicKey.length == 33` and
+     *         `InvalidPublicKeyPrefix` unless `publicKey[0]` is `0x02` / `0x03`.
      * @param  publicKey The caller's compressed (33-byte) secp256k1 public key.
      */
     function registerPublicKey(bytes calldata publicKey) external;

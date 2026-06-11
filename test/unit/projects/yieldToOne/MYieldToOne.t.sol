@@ -1178,6 +1178,23 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.setContractKey(sbytes32(bytes32(uint256(1))), tooLong);
     }
 
+    function test_setContractKey_zeroPrivateKey() public {
+        vm.expectRevert(IMYieldToOne.ZeroPrivateKey.selector);
+
+        vm.prank(admin);
+        mYieldToOne.setContractKey(sbytes32(bytes32(0)), _validPubKey(0xAA));
+    }
+
+    function test_setContractKey_invalidPrefix() public {
+        bytes memory pubKey = _validPubKey(0xAA);
+        pubKey[0] = 0x04;
+
+        vm.expectRevert(IMYieldToOne.InvalidPublicKeyPrefix.selector);
+
+        vm.prank(admin);
+        mYieldToOne.setContractKey(sbytes32(bytes32(uint256(1))), pubKey);
+    }
+
     function test_setContractKey_emitsContractKeySet() public {
         bytes memory pubKey = _validPubKey(0xAA);
 
@@ -1234,6 +1251,16 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         vm.prank(alice);
         mYieldToOne.registerPublicKey(tooLong);
+    }
+
+    function test_registerPublicKey_invalidPrefix() public {
+        bytes memory pubKey = _validPubKey(0xBB);
+        pubKey[0] = 0x04;
+
+        vm.expectRevert(IMYieldToOne.InvalidPublicKeyPrefix.selector);
+
+        vm.prank(alice);
+        mYieldToOne.registerPublicKey(pubKey);
     }
 
     function test_registerPublicKey_emitsPublicKeyRegistered() public {
