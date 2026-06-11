@@ -114,8 +114,8 @@ interface IMYieldToOne {
     ///         every historical ciphertext.
     error ContractKeyAlreadySet();
 
-    /// @notice Reverted by the encrypted-emit path if a shielded transfer is attempted
-    ///         before the admin has called `setContractKey`.
+    /// @notice Reverted by the encrypted-emit path if a shielded transfer or approval is
+    ///         attempted before the admin has called `setContractKey`.
     error ContractKeyNotSet();
 
     /// @notice Reverted by an encrypted-emit precompile wrapper when the underlying
@@ -202,6 +202,9 @@ interface IMYieldToOne {
      * @dev    MUST be sent as a Seismic `TxSeismic` transaction (type `0x4A`) so the
      *         private key is encrypted in calldata. This is an operational requirement
      *         that cannot be enforced from Solidity.
+     * @dev    Deliberately not folded into `initialize()`: initializer calldata travels in
+     *         plaintext inside the proxy deployment, which would leak the private key. Until
+     *         this is called, ALL user-path shielded transfers/approves revert `ContractKeyNotSet`.
      * @dev    Reverts `InvalidPublicKeyLength` unless `publicKey.length == 33` and
      *         `InvalidPublicKeyPrefix` unless `publicKey[0]` is `0x02` / `0x03`.
      * @dev    Reverts `ZeroPrivateKey` if `privateKey` is zero (a zero key would bypass

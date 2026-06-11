@@ -506,7 +506,9 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
     /**
      * @dev    Encrypts `amount` to `to`'s registered key for an encrypted-bytes event payload;
      *         AES-GCM under HKDF(ECDH(contractPrivKey, toPubKey)), nonce from the shared monotonic
-     *         counter. Reverts `ContractKeyNotSet` if the keypair is not installed.
+     *         counter. Reverts `ContractKeyNotSet` if the keypair is not installed — checked before
+     *         the unregistered fallback so all user-path emits fail uniformly pre-key (success
+     *         would otherwise leak who is registered).
      * @param  from   The counterparty address bound into the nonce derivation (sender / approver).
      * @param  to     The account whose registered key the ciphertext is encrypted to.
      * @param  amount The shielded amount to encrypt.
@@ -514,11 +516,12 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
      */
     function _encryptAmount(address from, address to, suint256 amount) internal returns (bytes memory) {
         MYieldToOneStorageStruct storage $ = _getMYieldToOneStorageLocation();
+
+        if (bytes32($.contractPrivateKey) == bytes32(0)) revert ContractKeyNotSet();
+
         bytes memory pubKey = $.publicKeys[to];
 
         if (pubKey.length == 0) return bytes("");
-
-        if (bytes32($.contractPrivateKey) == bytes32(0)) revert ContractKeyNotSet();
 
         // Pre-increment so the first nonce is 1 and no two emits reuse a nonce under one key.
         uint256 n = ++$.encryptedEventNonce;

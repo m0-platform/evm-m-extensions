@@ -425,6 +425,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 allowanceAmount = 1_500e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
+        _installContractKey();
+
         vm.prank(admin);
         mYieldToOne.setAllowlisted(carol, true);
 
@@ -447,6 +449,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
+        _installContractKey();
+
         vm.prank(alice);
         mYieldToOne.approve(address(swapFacility), suint256(amount));
 
@@ -465,6 +469,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
+        _installContractKey();
+
         vm.prank(admin);
         mYieldToOne.setAllowlisted(carol, true);
 
@@ -482,6 +488,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
+        _installContractKey();
+
         vm.prank(admin);
         mYieldToOne.setAllowlisted(carol, true);
 
@@ -498,6 +506,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     function test_nativeTransferFrom_paused() public {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
 
         vm.prank(admin);
         mYieldToOne.setAllowlisted(carol, true);
@@ -518,6 +528,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     function test_nativeTransferFrom_frozenAccount() public {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
 
         vm.prank(admin);
         mYieldToOne.setAllowlisted(carol, true);
@@ -540,6 +552,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
+        _installContractKey();
+
         vm.prank(admin);
         mYieldToOne.setAllowlisted(carol, true);
 
@@ -558,6 +572,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         // spendable by the shielded `transferFrom(suint256)` — proves the single shared slot.
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
 
         vm.prank(admin);
         mYieldToOne.setAllowlisted(carol, true);
@@ -662,6 +678,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
     function test_allowance_unauthorized() public {
         // alice approves bob; carol (third party) attempts to read → reverts.
+        _installContractKey();
+
         vm.prank(alice);
         mYieldToOne.approve(bob, suint256(500e6));
 
@@ -671,6 +689,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     }
 
     function test_allowance_ownerCanRead() public {
+        _installContractKey();
+
         vm.prank(alice);
         mYieldToOne.approve(bob, suint256(500e6));
 
@@ -679,6 +699,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     }
 
     function test_allowance_spenderCanRead() public {
+        _installContractKey();
+
         vm.prank(alice);
         mYieldToOne.approve(bob, suint256(500e6));
 
@@ -829,6 +851,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
+        _installContractKey();
+
         // Alice allows Carol to transfer tokens on her behalf (shielded approve).
         vm.prank(alice);
         mYieldToOne.approve(carol, suint256(amount));
@@ -885,6 +909,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
+        _installContractKey();
+
         // bob has no registered key => empty-ciphertext fallback emit (ciphertext assertions
         // live in the encrypted-transfer tests below).
         vm.expectEmit(true, true, false, true);
@@ -900,6 +926,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     function test_transfer_insufficientBalance() external {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount - 1);
+
+        _installContractKey();
 
         // Shielded comparison reverts with `balance = 0` (not the real balance) to avoid leak.
         vm.expectRevert(abi.encodeWithSelector(IMExtension.InsufficientBalance.selector, alice, 0, amount));
@@ -928,6 +956,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.setBalanceOf(alice, aliceBalance);
         mYieldToOne.setBalanceOf(bob, bobBalance);
 
+        _installContractKey();
+
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(transferAmount));
 
@@ -941,6 +971,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         uint256 allowanceAmount = 1_500e6;
         mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
 
         vm.prank(alice);
         mYieldToOne.approve(carol, suint256(allowanceAmount));
@@ -962,6 +994,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
+        _installContractKey();
+
         vm.prank(alice);
         mYieldToOne.approve(carol, suint256(type(uint256).max));
 
@@ -975,6 +1009,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     function test_transferFrom_insufficientAllowance() external {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
 
         vm.prank(alice);
         mYieldToOne.approve(carol, suint256(amount - 1));
@@ -1387,9 +1423,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount = 1_000e6;
         mYieldToOne.setBalanceOf(alice, amount);
 
-        // Contract key IS set — we want to isolate the unregistered-recipient branch from
-        // the no-contract-key branch (the fallback fires BEFORE the contract-key check, so
-        // both branches are independently testable).
+        // Contract key IS set — the key check fires BEFORE the unregistered-recipient
+        // fallback, so the fallback is only reachable post-key.
         _installContractKey();
 
         // bob is intentionally NOT registered; precompiles intentionally NOT mocked — the
@@ -1418,6 +1453,16 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         // Recipient IS registered but contract keypair is NOT installed → revert.
         vm.prank(bob);
         mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.expectRevert(IMYieldToOne.ContractKeyNotSet.selector);
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+    }
+
+    function test_shieldedTransfer_contractKeyNotSet_unregisteredRecipient_reverts() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
 
         vm.expectRevert(IMYieldToOne.ContractKeyNotSet.selector);
 
@@ -1492,9 +1537,12 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.registerPublicKey(_validPubKey(0xBB));
 
         vm.expectRevert(IMYieldToOne.ContractKeyNotSet.selector);
-
         vm.prank(alice);
         mYieldToOne.approve(bob, suint256(1_000e6));
+
+        vm.expectRevert(IMYieldToOne.ContractKeyNotSet.selector);
+        vm.prank(alice);
+        mYieldToOne.approve(carol, suint256(1_000e6));
     }
 
     function test_nativeApprove_emitsPlaintext() external {
