@@ -42,6 +42,12 @@ contract MYieldToOneIntegrationTests is BaseIntegrationTest {
                 mExtensionDeployOptions
             )
         );
+
+        vm.prank(admin);
+        mYieldToOne.setContractKey(
+            sbytes32(bytes32(uint256(0xC0FFEE))),
+            hex"02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
     }
 
     function test_integration_constants() external view {
@@ -89,7 +95,7 @@ contract MYieldToOneIntegrationTests is BaseIntegrationTest {
 
         // transfers do not affect yield
         vm.prank(alice);
-        mYieldToOne.transfer(bob, amount / 2);
+        mYieldToOne.transfer(bob, suint256(amount / 2));
 
         assertEq(mYieldToOne.getBalanceOf(bob), amount / 2);
         assertEq(mYieldToOne.getBalanceOf(alice), amount / 2);
@@ -269,8 +275,7 @@ contract MYieldToOneIntegrationTests is BaseIntegrationTest {
     }
 
     function test_unwrapWithPermits() external {
-        // `permit` reverts, so the `swapWithPermit` path is unsupported here. Migrated to the native
-        // `approve(swapFacility, amount)` path (swapFacility is infra), then a non-permit swap-out.
+        // `permit` reverts on MYieldToOne, so this swaps out via the native infra `approve` path.
         _addToList(EARNERS_LIST, address(mYieldToOne));
         mYieldToOne.enableEarning();
 
@@ -293,9 +298,7 @@ contract MYieldToOneIntegrationTests is BaseIntegrationTest {
     }
 
     function test_unwrapWithPermits_unsupported() external {
-        // The `swapWithPermit` swap-out is explicitly unsupported for MYieldToOne: `permit` reverts,
-        // the revert is swallowed by SwapFacility's try/catch, the shielded allowance stays zero, and
-        // the subsequent native `transferFrom` (SwapFacility is infra) reverts on zero allowance.
+        // `permit` reverts inside SwapFacility's try/catch, so the swap fails on the zero allowance.
         _addToList(EARNERS_LIST, address(mYieldToOne));
         mYieldToOne.enableEarning();
 
