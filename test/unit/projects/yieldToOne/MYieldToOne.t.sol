@@ -2041,4 +2041,370 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertTrue(foundPlaintextBurn, "missing plaintext Transfer(account, 0, amount) on burn");
         assertFalse(foundBytes, "burn leaked into encrypted-bytes Transfer overload");
     }
+
+    /* ============ _encryptAmount (fuzz) ============ */
+
+    function testFuzz_shieldedTransfer_registeredRecipient_burnsExactlyOneNonce(
+        uint256 amount,
+        bool selfTransfer
+    ) external {
+        amount = bound(amount, 0, type(uint240).max);
+
+        address recipient = selfTransfer ? alice : bob;
+
+        mYieldToOne.setBalanceOf(alice, type(uint240).max);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(recipient);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        uint256 nonceBefore = mYieldToOne.getEncryptedEventNonce();
+
+        vm.prank(alice);
+        mYieldToOne.transfer(recipient, suint256(amount));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore + 1);
+    }
+
+    function testFuzz_shieldedTransfer_unregisteredRecipient_neverBurnsNonce(uint256 amount) external {
+        amount = bound(amount, 0, type(uint240).max);
+
+        mYieldToOne.setBalanceOf(alice, type(uint240).max);
+
+        // Key IS set so the path is the unregistered-recipient fallback (empty ciphertext), not a revert.
+        _installContractKey();
+
+        uint256 nonceBefore = mYieldToOne.getEncryptedEventNonce();
+
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Transfer(alice, bob, bytes(""));
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore);
+    }
+
+    function testFuzz_shieldedTransfer_contractKeyNotSet_neverBurnsNonce(uint256 amount, bool registered) external {
+        amount = bound(amount, 1, type(uint240).max);
+
+        mYieldToOne.setBalanceOf(alice, type(uint240).max);
+
+        if (registered) {
+            vm.prank(bob);
+            mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+        }
+
+        vm.expectRevert(IMYieldToOne.ContractKeyNotSet.selector);
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
+        assertEq(mYieldToOne.getBalanceOf(alice), type(uint240).max);
+    }
+
+    function testFuzz_nativeTransferFrom_infraPath_neverBurnsNonce(uint256 amount) external {
+        amount = bound(amount, 1, type(uint240).max);
+
+        mYieldToOne.setBalanceOf(alice, type(uint240).max);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        // bob is registered; the infra (plaintext) path must still bypass the nonce.
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(carol, true);
+
+        vm.prank(alice);
+        mYieldToOne.approve(carol, suint256(type(uint256).max));
+
+        uint256 nonceBefore = mYieldToOne.getEncryptedEventNonce();
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, amount);
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore);
+    }
+
+    function testFuzz_shieldedTransfer_ciphertextMatchesPrecompileOutput(uint256 amount) external {
+        amount = bound(amount, 0, type(uint240).max);
+
+        mYieldToOne.setBalanceOf(alice, type(uint240).max);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.recordLogs();
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
+
+        assertTrue(bytesTopic != plaintextTopic, "bytes overload topic0 collides with uint256 overload");
+
+        bool foundBytes;
+        bool foundPlaintext;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(mYieldToOne)) continue;
+            if (logs[i].topics.length == 0) continue;
+
+            if (logs[i].topics[0] == bytesTopic) {
+                foundBytes = true;
+                assertEq(address(uint160(uint256(logs[i].topics[1]))), alice);
+                assertEq(address(uint160(uint256(logs[i].topics[2]))), bob);
+                assertEq(abi.decode(logs[i].data, (bytes)), hex"deadbeefcafebabe");
+            } else if (logs[i].topics[0] == plaintextTopic) {
+                foundPlaintext = true;
+            }
+        }
+
+        assertTrue(foundBytes, "missing Transfer(address,address,bytes) emit");
+        assertFalse(foundPlaintext, "plaintext Transfer(uint256) emitted on shielded path");
+    }
+
+    function testFuzz_shieldedApprove_ciphertextMatchesPrecompileOutput(uint256 amount) external {
+        amount = bound(amount, 0, type(uint256).max);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.recordLogs();
+
+        vm.prank(alice);
+        mYieldToOne.approve(bob, suint256(amount));
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 bytesTopic = keccak256("Approval(address,address,bytes)");
+        bytes32 plaintextTopic = keccak256("Approval(address,address,uint256)");
+
+        assertTrue(bytesTopic != plaintextTopic, "bytes overload topic0 collides with uint256 overload");
+
+        bool foundBytes;
+        bool foundPlaintext;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(mYieldToOne)) continue;
+            if (logs[i].topics.length == 0) continue;
+
+            if (logs[i].topics[0] == bytesTopic) {
+                foundBytes = true;
+                assertEq(address(uint160(uint256(logs[i].topics[1]))), alice);
+                assertEq(address(uint160(uint256(logs[i].topics[2]))), bob);
+                assertEq(abi.decode(logs[i].data, (bytes)), hex"deadbeefcafebabe");
+            } else if (logs[i].topics[0] == plaintextTopic) {
+                foundPlaintext = true;
+            }
+        }
+
+        assertTrue(foundBytes, "missing Approval(address,address,bytes) emit");
+        assertFalse(foundPlaintext, "plaintext Approval(uint256) emitted on shielded path");
+
+        assertEq(mYieldToOne.getShieldedAllowance(alice, bob), amount);
+    }
+
+    function testFuzz_encryptedEventNonce_strictlyIncrementsPerEmit(uint256 ops, uint256 seed) external {
+        ops = bound(ops, 1, 12);
+
+        mYieldToOne.setBalanceOf(alice, type(uint240).max);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        for (uint256 i; i < ops; ++i) {
+            uint256 nonceBefore = mYieldToOne.getEncryptedEventNonce();
+            uint256 amount = uint256(keccak256(abi.encode(seed, i))) % 1_000e6;
+
+            if (uint256(keccak256(abi.encode(seed, i, "kind"))) % 2 == 0) {
+                vm.prank(alice);
+                mYieldToOne.transfer(bob, suint256(amount));
+            } else {
+                vm.prank(alice);
+                mYieldToOne.approve(bob, suint256(amount));
+            }
+
+            assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore + 1);
+        }
+    }
+
+    /* ============ transferFrom (shielded) zero-amount ============ */
+
+    function test_shieldedTransferFrom_zeroAmount_registeredRecipient() external {
+        uint256 allowanceAmount = 1_500e6;
+        mYieldToOne.setBalanceOf(alice, 1_000e6);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.prank(alice);
+        mYieldToOne.approve(carol, suint256(allowanceAmount));
+
+        uint256 nonceBefore = mYieldToOne.getEncryptedEventNonce();
+
+        // Encrypted-bytes overload still fires (the encrypt pipeline runs before the zero-amount early return).
+        vm.expectEmit(true, true, false, true);
+        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, suint256(0));
+
+        // Allowance decremented by 0; a nonce is still burned; balances unchanged.
+        assertEq(mYieldToOne.getShieldedAllowance(alice, carol), allowanceAmount);
+        assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore + 1);
+        assertEq(mYieldToOne.getBalanceOf(alice), 1_000e6);
+        assertEq(mYieldToOne.getBalanceOf(bob), 0);
+    }
+
+    /* ============ _spendAllowanceAndTransfer (fuzz) ============ */
+
+    function testFuzz_shieldedTransferFrom_allowanceDecrement(
+        uint256 allowanceAmount,
+        uint256 transferAmount,
+        bool infinite
+    ) external {
+        allowanceAmount = bound(allowanceAmount, 1, type(uint240).max);
+        transferAmount = bound(transferAmount, 0, allowanceAmount);
+
+        mYieldToOne.setBalanceOf(alice, type(uint240).max);
+        mYieldToOne.setShieldedAllowance(alice, carol, infinite ? type(uint256).max : allowanceAmount);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, suint256(transferAmount));
+
+        assertEq(
+            mYieldToOne.getShieldedAllowance(alice, carol),
+            infinite ? type(uint256).max : allowanceAmount - transferAmount
+        );
+        assertEq(mYieldToOne.getBalanceOf(bob), transferAmount);
+    }
+
+    function testFuzz_shieldedTransferFrom_exactAllowanceBoundary(uint256 allowanceAmount) external {
+        allowanceAmount = bound(allowanceAmount, 1, type(uint240).max);
+
+        mYieldToOne.setBalanceOf(alice, type(uint240).max);
+        mYieldToOne.setShieldedAllowance(alice, carol, allowanceAmount);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        // amount == allowance succeeds and zeroes the allowance.
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, suint256(allowanceAmount));
+
+        assertEq(mYieldToOne.getShieldedAllowance(alice, carol), 0);
+        assertEq(mYieldToOne.getBalanceOf(bob), allowanceAmount);
+    }
+
+    function testFuzz_shieldedTransferFrom_overAllowanceBoundaryReverts(uint256 allowanceAmount) external {
+        allowanceAmount = bound(allowanceAmount, 0, type(uint240).max - 1);
+
+        mYieldToOne.setBalanceOf(alice, type(uint240).max);
+        mYieldToOne.setShieldedAllowance(alice, carol, allowanceAmount);
+
+        // amount == allowance + 1 reverts with a zeroed payload and leaves the allowance untouched.
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC20Extended.InsufficientAllowance.selector, carol, 0, allowanceAmount + 1)
+        );
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, suint256(allowanceAmount + 1));
+
+        assertEq(mYieldToOne.getShieldedAllowance(alice, carol), allowanceAmount);
+        assertEq(mYieldToOne.getBalanceOf(bob), 0);
+    }
+
+    function testFuzz_shieldedTransferFrom_residualAllowanceSpendableAfterDelisting(
+        uint256 allowanceAmount,
+        uint256 firstSpend,
+        uint256 secondSpend
+    ) external {
+        allowanceAmount = bound(allowanceAmount, 2, type(uint240).max);
+        firstSpend = bound(firstSpend, 1, allowanceAmount - 1);
+        secondSpend = bound(secondSpend, 0, allowanceAmount - firstSpend);
+
+        mYieldToOne.setBalanceOf(alice, type(uint240).max);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(carol, true);
+
+        // Grant while allowlisted, then de-list: the residual allowance must remain spendable via shielded transferFrom.
+        vm.prank(alice);
+        mYieldToOne.approve(carol, suint256(allowanceAmount));
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, suint256(firstSpend));
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(carol, false);
+
+        vm.prank(carol);
+        mYieldToOne.transferFrom(alice, bob, suint256(secondSpend));
+
+        assertEq(mYieldToOne.getShieldedAllowance(alice, carol), allowanceAmount - firstSpend - secondSpend);
+        assertEq(mYieldToOne.getBalanceOf(bob), firstSpend + secondSpend);
+    }
+
+    /* ============ boundary values ============ */
+
+    function test_transfer_maxUintAmount() external {
+        mYieldToOne.setBalanceOf(alice, type(uint256).max);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(type(uint256).max));
+
+        assertEq(mYieldToOne.getBalanceOf(alice), 0);
+        assertEq(mYieldToOne.getBalanceOf(bob), type(uint256).max);
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
+    }
+
+    function test_approve_maxUintAmount() external {
+        _installContractKey();
+
+        // type(uint256).max is the infinite, non-decrementing allowance sentinel.
+        vm.prank(alice);
+        mYieldToOne.approve(bob, suint256(type(uint256).max));
+
+        assertEq(mYieldToOne.getShieldedAllowance(alice, bob), type(uint256).max);
+
+        vm.prank(alice);
+        assertEq(mYieldToOne.allowance(alice, bob), type(uint256).max);
+    }
+
+    function test_balanceOf_maxUintBoundary() external {
+        mYieldToOne.setBalanceOf(alice, type(uint256).max);
+
+        vm.prank(alice);
+        assertEq(mYieldToOne.balanceOf(alice), type(uint256).max);
+    }
 }

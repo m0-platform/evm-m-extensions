@@ -5,6 +5,7 @@ pragma solidity ^0.8.26;
 import { Upgrades } from "../../../../lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { MYieldToOneForcedTransfer } from "../../../../src/projects/yieldToOne/MYieldToOneForcedTransfer.sol";
+import { IMYieldToOne } from "../../../../src/projects/yieldToOne/interfaces/IMYieldToOne.sol";
 
 import { ISwapFacility } from "../../../../src/swap/interfaces/ISwapFacility.sol";
 
@@ -51,7 +52,9 @@ contract MYieldToOneSimulationTests is BaseUnitTest {
         vm.prank(admin);
         mYieldToOne.setAllowlisted(infra, true);
 
-        holders = [alice, bob, charlie, david, yieldRecipient, address(swapFacility)];
+        // Widened beyond the balance-holding actors: `infra` (allowlisted) and `carol` (untouched, unregistered)
+        // must both stay at zero, exercising the gate/accounting checks against non-holders too.
+        holders = [alice, bob, charlie, david, yieldRecipient, address(swapFacility), infra, carol];
     }
 
     /* ============ Simulation ============ */
@@ -223,7 +226,17 @@ contract MYieldToOneSimulationTests is BaseUnitTest {
     function _checkInvariants() internal {
         uint256 sum;
         for (uint256 i; i < holders.length; ++i) {
-            sum += mYieldToOne.getBalanceOf(holders[i]);
+            uint256 balance = mYieldToOne.getBalanceOf(holders[i]);
+
+            // No individual balance may exceed totalSupply: a silent underflow would wrap a balance
+            // far past totalSupply and trip here before the sum check could mask it.
+            assertLe(
+                balance,
+                mYieldToOne.totalSupply(),
+                "Invariant 4 Failed: holder balance > totalSupply (underflow)"
+            );
+
+            sum += balance;
         }
 
         assertEq(sum, mYieldToOne.totalSupply(), "Invariant 1 Failed: sum of balances != totalSupply");
@@ -237,6 +250,18 @@ contract MYieldToOneSimulationTests is BaseUnitTest {
         uint256 nonce = mYieldToOne.getEncryptedEventNonce();
         assertGe(nonce, _lastNonce, "Invariant 3 Failed: encrypted event nonce decreased");
         _lastNonce = nonce;
+
+        // The shielded `balanceOf` gate must hold: `carol` is never granted a role, allowlisted, or made a holder,
+        // so a read of any holder by `carol` must revert `Unauthorized` regardless of the action sequence.
+        vm.prank(carol);
+        vm.expectRevert(IMYieldToOne.Unauthorized.selector);
+        mYieldToOne.balanceOf(alice);
+
+        // Allowance accounting must never leave a finite allowance dangling above the infinite sentinel,
+        // and the gated read must succeed for the owner: `alice -> infra` is read by `alice` and stays valid.
+        vm.prank(alice);
+        uint256 infraAllowance = mYieldToOne.allowance(alice, infra);
+        assertLe(infraAllowance, type(uint256).max, "Invariant 5 Failed: allowance exceeds uint256 max");
     }
 
     /* ============ Helpers ============ */
