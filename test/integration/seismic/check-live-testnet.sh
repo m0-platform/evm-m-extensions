@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Read-only status checklist for the live Seismic-testnet USDS deployment (chain 5124).
 # Sends NO transactions. PENDING lines are expected until the post-deploy chain
-# (configure-extension, set-contract-key — see RUNBOOK.md) has been run.
+# (make configure-extension-seismic-testnet, then make set-contract-key-seismic-testnet) has been run.
 #
 # Usage: bash test/integration/seismic/check-live-testnet.sh   (SEISMIC_TESTNET_RPC_URL to override)
 set -euo pipefail
@@ -70,4 +70,4 @@ if [ "$FAILURES" -gt 0 ]; then
     echo "$FAILURES check(s) FAILED"
     exit 1
 fi
-echo "checklist complete (PENDING items await the post-deploy chain — see RUNBOOK.md)"
+echo "checklist complete (PENDING items await the post-deploy chain — the configure-extension + set-contract-key make targets)"

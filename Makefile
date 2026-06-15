@@ -29,7 +29,7 @@ endif
 
 # Not runnable on this branch: crytic-compile cannot ingest mercury/ssolc builds (shielded types).
 slither:
-	@echo "slither cannot ingest mercury/ssolc builds; last clean static-analysis baseline is merge-base 87a2f42 on main — see AUDIT-SCOPE.md"
+	@echo "slither cannot ingest mercury/ssolc builds; last clean static-analysis baseline is merge-base 87a2f42 on main"
 	@exit 1
 
 # Common tasks — honor an inherited FOUNDRY_PROFILE (e.g. from .husky/pre-commit); default "seismic".

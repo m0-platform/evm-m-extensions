@@ -2,9 +2,9 @@
 
 > **Standalone branch.** This branch exists solely for the Seismic deployment of `MYieldToOne`
 > and never merges back to `main`. It builds with Seismic's `sforge`/`ssolc` toolchain — stock
-> Foundry cannot compile it (see [Building this branch](#building-this-branch-seismic-toolchain)
-> and [TOOLCHAIN.md](TOOLCHAIN.md)). Audit scope, trust model, and ERC-20 deviations live in
-> [AUDIT-SCOPE.md](AUDIT-SCOPE.md).
+> Foundry cannot compile it (see [Building this branch](#building-this-branch-seismic-toolchain)).
+> Audit scope and the ERC-20 deviations this branch introduces are summarized under
+> [Audit scope](#audit-scope).
 
 **M Extension Framework** is a modular templates of ERC-20 **stablecoin extensions** that wrap the yield-bearing `$M` token into non-rebasing variants for improved composability within DeFi. Each extension manages yield distribution differently and integrates with a central **SwapFacility** contract that acts as the exclusive entry point for wrapping and unwrapping.
 
@@ -16,7 +16,7 @@ All contracts are deployed behind transparent upgradeable proxies (by default).
 
 Each extension inherits from the abstract `MExtension` base contract, which defines shared wrapping logic. Only the `SwapFacility` is authorized to call `wrap()` and `unwrap()`. Yield is accrued based on the locked `$M` balance within each extension and minted via dedicated yield claim functions.
 
-On this branch, `MYieldToOne` is rewritten as a **shielded SRC-20** for the Seismic mercury EVM; the other extensions are source-unchanged (modulo pragma) but are recompiled with `ssolc`. See [AUDIT-SCOPE.md](AUDIT-SCOPE.md) for what is in scope.
+On this branch, `MYieldToOne` is rewritten as a **shielded SRC-20** for the Seismic mercury EVM; the other extensions are source-unchanged (modulo pragma) but are recompiled with `ssolc`. See [Audit scope](#audit-scope) for what is in scope.
 
 - **`MYieldToOne`** (shielded SRC-20 on this branch)
   - All yield goes to a single configurable `yieldRecipient`
@@ -60,7 +60,14 @@ On this branch, `MYieldToOne` is rewritten as a **shielded SRC-20** for the Seis
 
 ### Building this branch (Seismic toolchain)
 
-Shielded types (`suint256`, `sbytes32`) require Seismic's `ssolc` compiler fork and the `mercury` EVM revision; stock `forge`/`solc` fail at parse. Exact version pins and trust assumptions are in [TOOLCHAIN.md](TOOLCHAIN.md).
+Shielded types (`suint256`, `sbytes32`) require Seismic's `ssolc` compiler fork and the `mercury` EVM revision; stock `forge`/`solc` fail at parse. The deployed Seismic-testnet bytecode is built with the pinned toolchain below; reproduce the audit with exactly these versions:
+
+| Tool                          | Version                                    | Commit                                     |
+| ----------------------------- | ------------------------------------------ | ------------------------------------------ |
+| `sforge` / `scast` / `sanvil` | `1.3.5-v0.2.0`                             | `6065731fd5a1367603f6adac38f2fa174cbd66b8` |
+| `ssolc`                       | `0.8.31-develop.2026.4.29+commit.cd9163d8` | `cd9163d8d7926fee2e2d3fe1f9609548e0414bf1` |
+
+`sfoundryup` always fetches the _latest_ `ssolc` release, so confirm the installed `ssolc` matches the pin above after install. The socialscan verifier expects the label `v0.8.31+commit.cd9163d8` (the `-develop` prerelease tag stripped); `script/verify-seismic.py` handles that conversion.
 
 First-time setup (repo-local install, nothing touches `~`):
 
@@ -72,7 +79,7 @@ source scripts/seismic-env.sh
 curl -L -H "Accept: application/vnd.github.v3.raw" \
   "https://api.github.com/repos/SeismicSystems/seismic-foundry/contents/sfoundryup/install?ref=seismic" | bash
 
-# 3. Install the pinned toolchain release (see TOOLCHAIN.md for the ssolc pin)
+# 3. Install the pinned toolchain release (versions + commits in the table above)
 sfoundryup -i v0.2.0
 ```
 
@@ -88,6 +95,34 @@ Known limitations:
 - **No slither**: crytic-compile cannot ingest mercury/ssolc builds. The last clean static-analysis baseline is the merge-base with `main` (`87a2f42`).
 - **Integration tests need a Seismic devnet**: shielded reads use `eth_getFlaggedStorageAt`, which mainnet-fork RPCs do not serve.
 - **Verification** goes through `script/verify-seismic.py` (standard-JSON POST to the socialscan explorer API), not `forge verify-contract` — stock forge cannot reproduce mercury builds.
+
+---
+
+### Audit scope
+
+In scope — the shielded rewrite and what inherits it:
+
+| Path                                                    | Why                                                                                                                |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `src/projects/yieldToOne/MYieldToOne.sol`               | Shielded `suint256` balances/allowances, gated reads, shielded SRC-20 overloads, infra allowlist, encrypted events |
+| `src/projects/yieldToOne/MYieldToOneForcedTransfer.sol` | Forced transfers on shielded balances (deployed on chain 5124 as USDS)                                             |
+| `src/projects/yieldToOne/interfaces/IMYieldToOne.sol`   | Interface, events (incl. the `Transfer(…,bytes)` overload), errors                                                 |
+| `src/projects/jmi/JMIExtension.sol`                     | In the deployable seismic build; inherits the shielded `MYieldToOne`                                               |
+| `src/MExtension.sol`                                    | One behavioral line: `_revertIfInsufficientBalance` made `virtual`                                                 |
+| `lib/common` (`v1.5.1..a1fbf37`)                        | 12 lines: ERC-20 entry points made `virtual`                                                                       |
+
+Everything else in the diff vs `main` is pragma-only (`0.8.26` → `^0.8.26`). Every contract in the seismic build is recompiled with `ssolc`, so the prior audits (stock solc, unshielded) do not cover this bytecode — see [audits/README.md](audits/README.md).
+
+#### ERC-20 deviations (intended SRC-20 surface)
+
+| Surface                                 | This token                                                                                                                                                        |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `balanceOf` / `allowance`               | Gated reads: revert `Unauthorized` for third parties; allowed for the account itself, allowlisted infra, and compliance roles (freeze / forced-transfer managers) |
+| `transfer(address,uint256)`             | Always reverts `UseShieldedTransfer` — use `transfer(address,suint256)`                                                                                           |
+| `transferFrom(address,address,uint256)` | Allowlisted-infra callers only; others revert `UseShieldedTransfer`                                                                                               |
+| `approve(address,uint256)`              | Allowlisted-infra spenders only; others revert `UseShieldedApprove`                                                                                               |
+| `permit` (both overloads)               | Always revert `UseShieldedApprove`                                                                                                                                |
+| `Transfer` / `Approval` events          | A second `(…,bytes)` shape (distinct topic0) carries the encrypted amount on shielded paths; mint / burn / infra paths stay plaintext `uint256`                   |
 
 ---
 
@@ -125,13 +160,13 @@ A helper contract that enables token swaps via Uniswap V3.
 
 USDS ("Seismic Dollar") is an instance of `MYieldToOneForcedTransfer`.
 
-| Contract                              | Address                                                                                                                          |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| USDS Proxy                            | [0xb3b2f21f9a6a5d698D9178986Fa4148260B5d018](https://seismic-testnet.socialscan.io/address/0xb3b2f21f9a6a5d698D9178986Fa4148260B5d018) |
-| USDS Implementation                   | [0x268b6e7e1ef3f3eab7aab5b20286ab51997223d9](https://seismic-testnet.socialscan.io/address/0x268b6e7e1ef3f3eab7aab5b20286ab51997223d9) |
-| USDS ProxyAdmin                       | [0x3471d21118f19bfdb84591a92c82546c74f2f321](https://seismic-testnet.socialscan.io/address/0x3471d21118f19bfdb84591a92c82546c74f2f321) |
-| SwapFacility                          | [0xB6807116b3B1B321a390594e31ECD6e0076f6278](https://seismic-testnet.socialscan.io/address/0xB6807116b3B1B321a390594e31ECD6e0076f6278) |
-| M Token                               | [0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b](https://seismic-testnet.socialscan.io/address/0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b) |
+| Contract            | Address                                                                                                                                |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| USDS Proxy          | [0xb3b2f21f9a6a5d698D9178986Fa4148260B5d018](https://seismic-testnet.socialscan.io/address/0xb3b2f21f9a6a5d698D9178986Fa4148260B5d018) |
+| USDS Implementation | [0x268b6e7e1ef3f3eab7aab5b20286ab51997223d9](https://seismic-testnet.socialscan.io/address/0x268b6e7e1ef3f3eab7aab5b20286ab51997223d9) |
+| USDS ProxyAdmin     | [0x3471d21118f19bfdb84591a92c82546c74f2f321](https://seismic-testnet.socialscan.io/address/0x3471d21118f19bfdb84591a92c82546c74f2f321) |
+| SwapFacility        | [0xB6807116b3B1B321a390594e31ECD6e0076f6278](https://seismic-testnet.socialscan.io/address/0xB6807116b3B1B321a390594e31ECD6e0076f6278) |
+| M Token             | [0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b](https://seismic-testnet.socialscan.io/address/0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b) |
 
 ### SwapFacility
 

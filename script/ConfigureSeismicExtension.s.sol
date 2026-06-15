@@ -22,7 +22,7 @@ contract ConfigureSeismicExtension is ScriptBase {
         address extension = vm.envAddress("EXTENSION_PROXY");
         address swapFacility = _getSwapFacility();
 
-        // LIMIT_ORDER_PROTOCOL is optional: not yet deployed on Seismic testnet (see AUDIT-SCOPE.md).
+        // LIMIT_ORDER_PROTOCOL is optional: not yet deployed on Seismic testnet.
         address limitOrderProtocol = vm.envOr("LIMIT_ORDER_PROTOCOL", address(0));
 
         address[] memory infra = new address[](limitOrderProtocol == address(0) ? 1 : 2);

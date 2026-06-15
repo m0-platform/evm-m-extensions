@@ -60,7 +60,7 @@ Read-only status of the chain-5124 USDS deployment (sends nothing):
 bash test/integration/seismic/check-live-testnet.sh
 ```
 
-`[PENDING]` lines are expected until the post-deploy chain has run (RUNBOOK.md). Once
+`[PENDING]` lines are expected until the post-deploy chain has run (`make configure-extension-seismic-testnet`, then `make set-contract-key-seismic-testnet`). Once
 the contract key is installed, a live shielded-transfer smoke (register → transfer →
 decrypt) can reuse the exact scast/decryptor commands from `run-sanvil-e2e.sh` against
 `https://testnet-1.seismictest.net/rpc`.
@@ -70,11 +70,11 @@ decrypt) can reuse the exact scast/decryptor commands from `run-sanvil-e2e.sh` a
 Verified against seismic-revm/enclave sources and reproduced off-chain; the in-process
 suite and `script/decrypt-transfer-event.py --self-test` both assert these vectors.
 
-| Precompile | Semantics |
-|---|---|
-| `0x65` ECDH | in: 32-byte secp256k1 privkey ‖ 33-byte compressed pubkey. out: HKDF-SHA256(salt=∅, info=`"aes-gcm key"`) of the libsecp256k1 shared secret (= SHA-256 of the compressed shared point) — already a derived key, **not** the raw x-coordinate. Errors on off-curve points. |
-| `0x68` HKDF | out: HKDF-SHA256(salt=∅, info=`"seismic_hkdf_105"`, L=32) of the input bytes. |
-| `0x66` / `0x67` AES-GCM | in: 32-byte key ‖ 12-byte nonce ‖ payload. AES-256-GCM; ciphertext layout `ct ‖ 16-byte tag`; empty AAD. `0x67` is the tag-checked inverse. |
+| Precompile              | Semantics                                                                                                                                                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0x65` ECDH             | in: 32-byte secp256k1 privkey ‖ 33-byte compressed pubkey. out: HKDF-SHA256(salt=∅, info=`"aes-gcm key"`) of the libsecp256k1 shared secret (= SHA-256 of the compressed shared point) — already a derived key, **not** the raw x-coordinate. Errors on off-curve points. |
+| `0x68` HKDF             | out: HKDF-SHA256(salt=∅, info=`"seismic_hkdf_105"`, L=32) of the input bytes.                                                                                                                                                                                             |
+| `0x66` / `0x67` AES-GCM | in: 32-byte key ‖ 12-byte nonce ‖ payload. AES-256-GCM; ciphertext layout `ct ‖ 16-byte tag`; empty AAD. `0x67` is the tag-checked inverse.                                                                                                                               |
 
 Event key = `0x68(0x65(contractPriv, recipientPub))` — a double HKDF.
 Event nonce = first 12 bytes of `keccak256(abi.encode(from, to, nonceCounter))`,

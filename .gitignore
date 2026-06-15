@@ -11,9 +11,8 @@ out/
 coverage/
 lcov.info
 
-# Docs (generated `forge doc` output and drafts; docs/audit/ is hand-written and tracked)
-docs/*
-!docs/audit/
+# Docs (generated `forge doc` output, design notes, and drafts — all internal, not tracked)
+docs/
 
 # Dotenv file
 .env

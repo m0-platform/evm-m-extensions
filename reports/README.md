@@ -4,18 +4,18 @@ Generated 2026-06-11 on branch `seismic-audit-readiness` at commit `55502a2`
 (`fix(script): make LimitOrderProtocol optional in ConfigureSeismicExtension`) with the pinned
 Seismic toolchain — `sforge 1.3.5-v0.2.0` (commit `6065731`) / `ssolc 0.8.31-develop.2026.4.29+commit.cd9163d8`,
 `FOUNDRY_PROFILE=seismic` (mercury EVM, optimizer on, `optimizer_runs = 800`) via
-`source scripts/seismic-env.sh` (see [TOOLCHAIN.md](../TOOLCHAIN.md)). All artifacts come from the
+`source scripts/seismic-env.sh`. All artifacts come from the
 unit suite (`test/unit/**`, 468 tests, 0 failures); `test/integration/**` is excluded because
 mainnet-fork RPCs lack `eth_getFlaggedStorageAt` (it runs on a Seismic devnet via `make integration`).
 
 ## Files
 
-| File | Command | Contents |
-| ---- | ------- | -------- |
-| `coverage-summary.txt` | `FOUNDRY_PROFILE=seismic FOUNDRY_FORCE=false sforge coverage --report summary --report lcov --no-match-coverage '(script\|test\|lib)' --match-path 'test/unit/**' --skip 'test/integration/**'` (after a `sforge build --force` to pre-populate `out/` — see note) | Per-file line/statement/branch/function coverage for `src/**` |
-| `coverage-lcov.info` | same run (`lcov.info` renamed; the root `.gitignore` ignores the default name at any depth) | Machine-readable LCOV for the 13 `src/**` files |
-| `gas-report.txt` | `sforge test --match-path 'test/unit/**' --gas-report --force` (ANSI stripped) | Full unit-run log (468 named passing tests) + per-contract gas tables |
-| `contract-sizes.txt` | `sforge build --force --sizes` (table only) | Runtime/initcode sizes and EIP-170/EIP-3860 margins, all contracts incl. test harnesses |
+| File                   | Command                                                                                                                                                                                                                                                            | Contents                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `coverage-summary.txt` | `FOUNDRY_PROFILE=seismic FOUNDRY_FORCE=false sforge coverage --report summary --report lcov --no-match-coverage '(script\|test\|lib)' --match-path 'test/unit/**' --skip 'test/integration/**'` (after a `sforge build --force` to pre-populate `out/` — see note) | Per-file line/statement/branch/function coverage for `src/**`                           |
+| `coverage-lcov.info`   | same run (`lcov.info` renamed; the root `.gitignore` ignores the default name at any depth)                                                                                                                                                                        | Machine-readable LCOV for the 13 `src/**` files                                         |
+| `gas-report.txt`       | `sforge test --match-path 'test/unit/**' --gas-report --force` (ANSI stripped)                                                                                                                                                                                     | Full unit-run log (468 named passing tests) + per-contract gas tables                   |
+| `contract-sizes.txt`   | `sforge build --force --sizes` (table only)                                                                                                                                                                                                                        | Runtime/initcode sizes and EIP-170/EIP-3860 margins, all contracts incl. test harnesses |
 
 Reproduction note for coverage: `sforge coverage` compiles in-memory without writing artifacts,
 and the seismic profile's `force = true` wipes `out/` first — which breaks the 11 OZ-Upgrades-based
