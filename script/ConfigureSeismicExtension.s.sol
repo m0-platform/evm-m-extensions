@@ -31,7 +31,6 @@ contract ConfigureSeismicExtension is ScriptBase {
 
         vm.startBroadcast(deployer);
 
-        ISwapFacility(swapFacility).setAdminApprovedExtension(extension, true);
         IMYieldToOne(extension).setAllowlisted(infra, true);
 
         vm.stopBroadcast();
