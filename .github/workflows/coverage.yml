@@ -1,10 +1,10 @@
+# Disabled on the Seismic branch: stock forge cannot compile shielded types
+# (suint256) and this branch never merges to main. CI runs test-seismic.yml
+# instead; a manual dispatch of this workflow will fail at compile.
 name: Forge Coverage
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
+  workflow_dispatch:
 
 permissions: write-all
 

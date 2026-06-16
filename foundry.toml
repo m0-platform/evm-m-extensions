@@ -1,3 +1,6 @@
+# [profile.seismic] inherits optimizer/ffi/build_info/remappings from this profile —
+# load-bearing for the deployed Seismic bytecode. ssolc ignores `solc_version`.
+# evm_version must stay "cancun" here so stock-forge `clean`/`update` keep working.
 [profile.default]
 evm_version = "cancun"
 gas_reports = ["*"]
@@ -27,18 +30,12 @@ lint_on_build = false
 build_info = true
 sizes = true
 
-# Seismic profile — builds MYieldToOne with ssolc (0.8.31). Activate: `FOUNDRY_PROFILE=seismic sforge build`.
-# `evm_version = "mercury"` is the Seismic EVM revision that supports shielded types (suint/sbool/saddress/sbytes);
-# the default profile stays cancun + solc 0.8.26 so sibling-extension builds remain audit-reproducible.
-# `optimizer_runs = 800` (vs default 19 999): the shielded closure pushes JMIExtension to 25 853 B at 19 999,
-# over the EIP-170 24 576 B limit; 800 is the size/gas knee → 23 240 B (+1 336 headroom).
-# `no_match_path` skips, under this profile only: (1) test/integration/** — forks ETH mainnet, whose RPC lacks
-# `eth_getFlaggedStorageAt` for shielded reads (run on Seismic devnet instead); (2) JMIExtension.t.sol — written
-# against the unshielded `balanceOf`, so it trips `Unauthorized()`; JMI runs under the default profile.
+# Seismic profile (ssolc / mercury) — the only profile that compiles this branch. Activate: `FOUNDRY_PROFILE=seismic sforge build`.
 [profile.seismic]
-evm_version = "mercury"
-optimizer_runs = 800
-no_match_path = "test/{integration/**,unit/projects/JMIExtension.t.sol}"
+evm_version = "mercury" # Seismic EVM revision with shielded types (suint/sbool/saddress/sbytes)
+optimizer_runs = 800 # default 19_999 puts JMIExtension at 25_853 B, over EIP-170; 800 → 23_240 B
+force = true # full rebuilds: OZ upgrades-core validation flakes on partial build-info
+no_match_path = "test/integration/**" # mainnet-fork RPCs lack eth_getFlaggedStorageAt; run via `make integration` on Seismic devnet
 
 [fuzz]
 runs = 5_000
@@ -47,13 +44,6 @@ runs = 5_000
 runs = 512            # The number of calls to make in the invariant tests
 depth = 25            # The number of times to run the invariant tests
 fail_on_revert = true # Fail the test if the contract reverts
-
-[profile.ci.fuzz]
-runs = 10_000
-
-[profile.ci.invariant]
-runs = 512
-depth = 250
 
 [rpc_endpoints]
 localhost = "${LOCALHOST_RPC_URL}"

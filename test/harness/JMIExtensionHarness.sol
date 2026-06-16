@@ -38,6 +38,16 @@ contract JMIExtensionHarness is JMIExtension {
         _getMYieldToOneStorageLocation().balanceOf[account] = suint256(amount);
     }
 
+    /// @dev Bypasses the public `balanceOf` gate.
+    function getBalanceOf(address account) external view returns (uint256) {
+        return uint256(_getMYieldToOneStorageLocation().balanceOf[account]);
+    }
+
+    /// @dev Reads the encrypted-event nonce counter.
+    function getEncryptedEventNonce() external view returns (uint256) {
+        return _getMYieldToOneStorageLocation().encryptedEventNonce;
+    }
+
     function setTotalAssets(uint256 amount) external {
         _getJMIExtensionStorageLocation().totalAssets = amount;
     }

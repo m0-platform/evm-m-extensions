@@ -132,6 +132,10 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         swapFacility.grantRole(M_SWAPPER_ROLE, alice);
         swapFacility.grantRole(M_SWAPPER_ROLE, bob);
         swapFacility.grantRole(M_SWAPPER_ROLE, carol);
+        mYieldToOne.setContractKey(
+            sbytes32(bytes32(uint256(0xC0FFEE))),
+            hex"02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
         vm.stopPrank();
     }
 
@@ -188,7 +192,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         vm.prank(alice);
         swapFacility.swap(address(mYieldFee), address(mYieldToOne), mYieldFeeBalance - 2, alice);
 
-        uint256 mYieldToOneBalance = mYieldToOne.balanceOf(alice);
+        uint256 mYieldToOneBalance = mYieldToOne.getBalanceOf(alice);
         assertEq(mYieldToOneBalance, 10e6 - 2);
 
         vm.prank(alice);
@@ -231,7 +235,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         vm.prank(alice);
         swapFacility.swap(address(mYieldFee), address(mYieldToOne), mYieldFeeBalance, alice);
 
-        uint256 mYieldToOneBalance = mYieldToOne.balanceOf(alice);
+        uint256 mYieldToOneBalance = mYieldToOne.getBalanceOf(alice);
         assertEq(mYieldToOneBalance, 10e6);
 
         // fast forward to accrue yield
@@ -284,7 +288,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
 
         mYieldToOne.claimYield();
 
-        mYieldToOneBalance = mYieldToOne.balanceOf(yieldRecipient);
+        mYieldToOneBalance = mYieldToOne.getBalanceOf(yieldRecipient);
 
         assertEq(mYieldToOneBalance, 11401, "yield recipient should have its yield claimed");
 
@@ -364,7 +368,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         swapFacility.swap(extensions[extensionIndex], address(mToken), amount, alice);
 
         mYieldToOne.claimYield();
-        assertApproxEqAbs(mYieldToOne.balanceOf(yieldRecipient), yields[M_YIELD_TO_ONE], 20);
+        assertApproxEqAbs(mYieldToOne.getBalanceOf(yieldRecipient), yields[M_YIELD_TO_ONE], 20);
 
         mYieldFee.claimYieldFor(alice);
         assertApproxEqAbs(mYieldFee.balanceOf(alice), yields[M_YIELD_FEE], 50);
@@ -508,7 +512,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         vm.prank(alice);
         swapFacility.swap(address(mEarnerManager), address(mYieldToOne), 10e6 - 2, alice);
 
-        assertEq(mYieldToOne.balanceOf(alice), 10e6, "mYieldToOne balance should be 10e6");
+        assertEq(mYieldToOne.getBalanceOf(alice), 10e6, "mYieldToOne balance should be 10e6");
 
         vm.expectRevert(abi.encodeWithSelector(ISwapFacility.PermissionedExtension.selector, address(mYieldFee)));
 
@@ -529,6 +533,9 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
 
         vm.prank(earnerManager);
         mEarnerManager.setAccountInfo(address(swapAdapter), true, 0);
+
+        vm.prank(admin);
+        mYieldToOne.setAllowlisted(address(swapAdapter), true);
 
         vm.startPrank(alice);
 
@@ -554,7 +561,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         vm.prank(alice);
         swapFacility.swap(address(mToken), address(mYieldToOne), 10e6, alice);
 
-        assertEq(mYieldToOne.balanceOf(alice), 10e6, "mYieldToOne balance should be 10e6");
+        assertEq(mYieldToOne.getBalanceOf(alice), 10e6, "mYieldToOne balance should be 10e6");
 
         vm.prank(alice);
         swapAdapter.swapOut(address(mYieldToOne), 10e6 - 2, USDC, 0, alice, "");
@@ -566,7 +573,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         vm.prank(alice);
         swapAdapter.swapIn(USDC, usdcBalance, address(mYieldToOne), 0, alice, "");
 
-        uint256 yieldToOneBalance = mYieldToOne.balanceOf(alice);
+        uint256 yieldToOneBalance = mYieldToOne.getBalanceOf(alice);
 
         assertEq(yieldToOneBalance, 9997997, "mYieldToOne balance of alice should be 10e6");
 
@@ -609,7 +616,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         vm.stopPrank();
 
         vm.prank(alice);
-        mYieldToOne.approve(bob, 10e6);
+        mYieldToOne.approve(bob, suint256(10e6));
 
         vm.prank(bob);
         mToken.approve(address(swapFacility), 10e6);
@@ -617,7 +624,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         vm.prank(alice);
         swapFacility.swap(address(mToken), address(mYieldToOne), 10e6, alice);
 
-        uint256 mYieldToOneBalance = mYieldToOne.balanceOf(alice);
+        uint256 mYieldToOneBalance = mYieldToOne.getBalanceOf(alice);
 
         assertEq(mYieldToOneBalance, 10e6, "mYieldToOneBalance should be 10e6");
 
@@ -648,7 +655,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         mYieldToOne.claimYield();
 
         assertEq(
-            mYieldToOne.balanceOf(yieldRecipient),
+            mYieldToOne.getBalanceOf(yieldRecipient),
             mBalanceAfter - mBalanceBefore - 2,
             "yield should be claimed to yield recipient"
         );
@@ -660,17 +667,17 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         swapFacility.swap(address(mYieldToOne), address(mYieldFee), 10e6 - 2, alice);
 
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        mYieldToOne.transfer(bob, 10e6);
+        mYieldToOne.transfer(bob, suint256(10e6));
 
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        mYieldToOne.approve(bob, 10e6);
+        mYieldToOne.approve(bob, suint256(10e6));
 
         vm.stopPrank();
 
         vm.startPrank(bob);
 
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        mYieldToOne.transferFrom(alice, bob, 10e6);
+        mYieldToOne.transferFrom(alice, bob, suint256(10e6));
 
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
         swapFacility.swap(address(mToken), address(mYieldToOne), 10e6, alice);
@@ -702,7 +709,7 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
         swapFacility.swap(address(mToken), address(mYieldToOne), 10e6, bob);
 
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        mYieldToOne.transfer(alice, 10e6);
+        mYieldToOne.transfer(alice, suint256(10e6));
     }
 
     function test_mEarnerManager_whitelistManagement_withActivePositions() public {

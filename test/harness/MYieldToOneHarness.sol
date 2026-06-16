@@ -24,7 +24,7 @@ contract MYieldToOneHarness is MYieldToOne {
         _getMYieldToOneStorageLocation().balanceOf[account] = suint256(amount);
     }
 
-    /// @dev Bypasses the public `balanceOf` gate — for test assertions only.
+    /// @dev Bypasses the public `balanceOf` gate.
     function getBalanceOf(address account) external view returns (uint256) {
         return uint256(_getMYieldToOneStorageLocation().balanceOf[account]);
     }
@@ -37,12 +37,12 @@ contract MYieldToOneHarness is MYieldToOne {
         _getMYieldToOneStorageLocation().shieldedAllowance[owner][spender] = suint256(amount);
     }
 
-    /// @dev Bypasses the `shieldedAllowance` gate — for test assertions only.
+    /// @dev Bypasses the gated `allowance` read.
     function getShieldedAllowance(address owner, address spender) external view returns (uint256) {
         return uint256(_getMYieldToOneStorageLocation().shieldedAllowance[owner][spender]);
     }
 
-    /// @dev Reads the monotonic encrypted-event nonce counter (slot 8) — for test assertions only.
+    /// @dev Reads the encrypted-event nonce counter.
     function getEncryptedEventNonce() external view returns (uint256) {
         return _getMYieldToOneStorageLocation().encryptedEventNonce;
     }

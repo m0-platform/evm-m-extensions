@@ -11,7 +11,7 @@ out/
 coverage/
 lcov.info
 
-# Docs
+# Docs (generated `forge doc` output, design notes, and drafts — all internal, not tracked)
 docs/
 
 # Dotenv file
