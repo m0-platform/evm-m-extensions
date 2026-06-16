@@ -18,6 +18,11 @@ permissions:
 env:
   # Pinned toolchain version: bump deliberately (also rolls the cache key).
   SFORGE_VERSION: 1.3.5-v0.2.0
+  # Toolchain-cache layout version: bump to invalidate caches when the contents of
+  # .seismic-toolchain change shape (independent of SFORGE_VERSION). v2 added the
+  # co-located `ssolc` binary; v1 caches only held sforge/sanvil/scast, so cache-hit
+  # runs failed at compile time with "`ssolc` not found in PATH".
+  TOOLCHAIN_CACHE_VERSION: v2
 
 jobs:
   test:
@@ -33,22 +38,37 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .seismic-toolchain
-          key: seismic-toolchain-${{ runner.os }}-sforge-${{ env.SFORGE_VERSION }}
+          key: seismic-toolchain-${{ runner.os }}-sforge-${{ env.SFORGE_VERSION }}-${{ env.TOOLCHAIN_CACHE_VERSION }}
 
       - name: Install Seismic toolchain
         if: steps.toolchain-cache.outputs.cache-hit != 'true'
         run: |
+          set -euo pipefail
           export FOUNDRY_DIR="$PWD/.seismic-toolchain"
-          export PATH="$FOUNDRY_DIR/bin:$PATH"
+          export FOUNDRY_BIN_DIR="$FOUNDRY_DIR/bin"
+          export PATH="$FOUNDRY_BIN_DIR:$PATH"
           curl -L -H "Accept: application/vnd.github.v3.raw" \
             "https://api.github.com/repos/SeismicSystems/seismic-foundry/contents/sfoundryup/install?ref=seismic" | bash
           sfoundryup
+          # sfoundryup installs `ssolc` to /usr/local/bin (its install_ssolc ignores
+          # FOUNDRY_BIN_DIR), which is NOT under the cached .seismic-toolchain dir — so
+          # the compiler is lost on cache-hit runs. Co-locate it in the toolchain bin
+          # (the only dir the Makefile adds to PATH) so it's cached and restored too.
+          if [ ! -x "$FOUNDRY_BIN_DIR/ssolc" ]; then
+            cp "$(command -v ssolc)" "$FOUNDRY_BIN_DIR/ssolc"
+          fi
 
-      - name: Assert pinned sforge version
+      - name: Assert pinned toolchain (sforge + ssolc)
         run: |
           ./.seismic-toolchain/bin/sforge --version
           ./.seismic-toolchain/bin/sforge --version | grep -F "$SFORGE_VERSION" \
             || { echo "sfoundryup installed sforge != $SFORGE_VERSION (installer tracks upstream latest); bump SFORGE_VERSION deliberately"; exit 1; }
+          # ssolc must live in the cached toolchain dir, else cache-hit runs fail at
+          # compile time with "`ssolc` not found in PATH" (the Makefile only prepends
+          # .seismic-toolchain/bin to PATH). Fail fast here instead.
+          test -x ./.seismic-toolchain/bin/ssolc \
+            || { echo "ssolc missing from .seismic-toolchain/bin (stale cache predating ssolc co-location); bump TOOLCHAIN_CACHE_VERSION to invalidate"; exit 1; }
+          ./.seismic-toolchain/bin/ssolc --version
 
       - name: Run unit tests (seismic profile)
         run: make tests profile=seismic
