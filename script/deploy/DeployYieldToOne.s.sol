@@ -18,6 +18,7 @@ contract DeployYieldToOne is DeployBase {
         extensionConfig.freezeManager = vm.envAddress("FREEZE_MANAGER");
         extensionConfig.yieldRecipientManager = vm.envAddress("YIELD_RECIPIENT_MANAGER");
         extensionConfig.pauser = vm.envAddress("PAUSER");
+        extensionConfig.allowlistAdmin = vm.envAddress("ALLOWLIST_ADMIN");
 
         // Verify predicted address (if PREDICTED_ADDRESS env var is set)
         if (_shouldVerifyPredictedAddress()) {

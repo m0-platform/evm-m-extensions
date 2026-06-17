@@ -3,8 +3,10 @@
 pragma solidity ^0.8.26;
 
 import { ERC20ExtendedUpgradeable } from "../../../lib/common/src/ERC20ExtendedUpgradeable.sol";
+import { ERC3009Upgradeable } from "../../../lib/common/src/ERC3009Upgradeable.sol";
 import { IERC20 } from "../../../lib/common/src/interfaces/IERC20.sol";
 import { IERC20Extended } from "../../../lib/common/src/interfaces/IERC20Extended.sol";
+import { IERC3009 } from "../../../lib/common/src/interfaces/IERC3009.sol";
 
 import { IMYieldToOne } from "./interfaces/IMYieldToOne.sol";
 
@@ -22,7 +24,7 @@ abstract contract MYieldToOneStorageLayout {
         mapping(address account => mapping(address spender => suint256 allowance)) shieldedAllowance;
         mapping(address account => bool isAllowlisted) allowlist;
         mapping(address account => bytes publicKey) publicKeys;
-        bytes _contractPublicKey;
+        bytes contractPublicKey;
         // Set once via `setContractKey` (TxSeismic 0x4A only); no getter exposes it.
         sbytes32 contractPrivateKey;
         // Monotonic counter feeding the per-emit AES-GCM nonce; pre-incremented so nonces never repeat.
@@ -52,6 +54,12 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
     /// @inheritdoc IMYieldToOne
     bytes32 public constant YIELD_RECIPIENT_MANAGER_ROLE = keccak256("YIELD_RECIPIENT_MANAGER_ROLE");
 
+    /// @inheritdoc IMYieldToOne
+    bytes32 public constant ALLOWLIST_MANAGER_ROLE = keccak256("ALLOWLIST_MANAGER_ROLE");
+
+    /// @inheritdoc IMYieldToOne
+    bytes32 public constant ALLOWLIST_ADMIN_ROLE = keccak256("ALLOWLIST_ADMIN_ROLE");
+
     /* ============ Constructor ============ */
 
     /**
@@ -74,6 +82,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
      * @param freezeManager         The address of a freeze manager.
      * @param yieldRecipientManager The address of a yield recipient setter.
      * @param pauser                The address of a pauser.
+     * @param allowlistAdmin        The address granted the allowlist admin role (manages the allowlist-manager role).
      */
     function initialize(
         string memory name,
@@ -82,9 +91,19 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         address admin,
         address freezeManager,
         address yieldRecipientManager,
-        address pauser
+        address pauser,
+        address allowlistAdmin
     ) public virtual initializer {
-        __MYieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, yieldRecipientManager, pauser);
+        __MYieldToOne_init(
+            name,
+            symbol,
+            yieldRecipient_,
+            admin,
+            freezeManager,
+            yieldRecipientManager,
+            pauser,
+            allowlistAdmin
+        );
     }
 
     /**
@@ -96,6 +115,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
      * @param freezeManager         The address of a freeze manager.
      * @param yieldRecipientManager The address of a yield recipient setter.
      * @param pauser                The address of a pauser.
+     * @param allowlistAdmin        The address granted the allowlist admin role (manages the allowlist-manager role).
      */
     function __MYieldToOne_init(
         string memory name,
@@ -104,10 +124,12 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         address admin,
         address freezeManager,
         address yieldRecipientManager,
-        address pauser
+        address pauser,
+        address allowlistAdmin
     ) internal onlyInitializing {
         if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
         if (admin == address(0)) revert ZeroAdmin();
+        if (allowlistAdmin == address(0)) revert ZeroAllowlistAdmin();
 
         __MExtension_init(name, symbol);
         __Freezable_init(freezeManager);
@@ -115,8 +137,13 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
 
         _setYieldRecipient(yieldRecipient_);
 
+        // The allowlist manager (who calls `setAllowlisted`) is administered by a dedicated allowlist
+        // admin rather than the DEFAULT_ADMIN_ROLE, so allowlist control can be delegated independently.
+        _setRoleAdmin(ALLOWLIST_MANAGER_ROLE, ALLOWLIST_ADMIN_ROLE);
+
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(YIELD_RECIPIENT_MANAGER_ROLE, yieldRecipientManager);
+        _grantRole(ALLOWLIST_ADMIN_ROLE, allowlistAdmin);
     }
 
     /* ============ Interactive Functions ============ */
@@ -145,12 +172,15 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
     }
 
     /// @inheritdoc IMYieldToOne
-    function setAllowlisted(address account, bool status) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setAllowlisted(address account, bool status) external virtual onlyRole(ALLOWLIST_MANAGER_ROLE) {
         _setAllowlisted(account, status);
     }
 
     /// @inheritdoc IMYieldToOne
-    function setAllowlisted(address[] calldata accounts, bool status) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setAllowlisted(
+        address[] calldata accounts,
+        bool status
+    ) external virtual onlyRole(ALLOWLIST_MANAGER_ROLE) {
         for (uint256 i; i < accounts.length; ++i) {
             _setAllowlisted(accounts[i], status);
         }
@@ -171,7 +201,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         if (bytes32($.contractPrivateKey) != bytes32(0)) revert ContractKeyAlreadySet();
 
         $.contractPrivateKey = privateKey;
-        $._contractPublicKey = publicKey;
+        $.contractPublicKey = publicKey;
 
         emit ContractKeySet(publicKey);
     }
@@ -258,6 +288,93 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         revert UseShieldedApprove();
     }
 
+    // ERC-3009 transfer/receive hard-code a plaintext `uint256 value`, so they cannot be shielded. Disable
+    // them (mirroring the `permit` reverts above) to keep amounts off the public, encryption-bypassing path.
+
+    /// @inheritdoc IERC3009
+    function transferWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        bytes memory /* signature */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
+    /// @inheritdoc IERC3009
+    function transferWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        bytes32 /* r */,
+        bytes32 /* vs */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
+    /// @inheritdoc IERC3009
+    function transferWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        uint8 /* v */,
+        bytes32 /* r */,
+        bytes32 /* s */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
+    /// @inheritdoc IERC3009
+    function receiveWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        bytes memory /* signature */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
+    /// @inheritdoc IERC3009
+    function receiveWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        bytes32 /* r */,
+        bytes32 /* vs */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
+    /// @inheritdoc IERC3009
+    function receiveWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        uint8 /* v */,
+        bytes32 /* r */,
+        bytes32 /* s */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
     /* ============ View/Pure Functions ============ */
 
     /// @inheritdoc IERC20
@@ -313,7 +430,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
 
     /// @inheritdoc IMYieldToOne
     function contractPublicKey() external view returns (bytes memory) {
-        return _getMYieldToOneStorageLocation()._contractPublicKey;
+        return _getMYieldToOneStorageLocation().contractPublicKey;
     }
 
     /* ============ Hooks For Internal Interactive Functions ============ */
@@ -464,16 +581,17 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
     function _shieldedTransfer(address sender, address recipient, suint256 amount, bool encryptEmit) internal {
         uint256 amount_ = uint256(amount);
 
+        if (amount_ == 0) return;
+
         _revertIfInvalidRecipient(recipient);
         _beforeTransfer(sender, recipient, amount_);
 
         if (encryptEmit) {
-            emit Transfer(sender, recipient, _encryptAmount(sender, recipient, amount));
+            (bytes32 encryptKeyHash, bytes memory ciphertext) = _encryptAmount(sender, recipient, amount);
+            emit Transfer(sender, recipient, encryptKeyHash, ciphertext);
         } else {
             emit Transfer(sender, recipient, amount_);
         }
-
-        if (amount_ == 0) return;
 
         // NOTE: Branching on a shielded value leaks a 1-bit comparison via revert-vs-success;
         //       accepted — inherent to ERC20 insufficient-balance semantics (ssolc 10311).
@@ -490,24 +608,33 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
      * @param  from   The counterparty address bound into the nonce derivation (sender / approver).
      * @param  to     The account whose registered key the ciphertext is encrypted to.
      * @param  amount The shielded amount to encrypt.
-     * @return The AES-GCM ciphertext, or empty bytes if `to` has not registered a key.
+     * @return encryptKeyHash `keccak256` of `to`'s registered public key, or `bytes32(0)` if `to` has no key.
+     * @return ciphertext     The AES-GCM ciphertext, or empty bytes if `to` has not registered a key.
      */
-    function _encryptAmount(address from, address to, suint256 amount) internal returns (bytes memory) {
+    function _encryptAmount(
+        address from,
+        address to,
+        suint256 amount
+    ) internal returns (bytes32 encryptKeyHash, bytes memory ciphertext) {
         MYieldToOneStorageStruct storage $ = _getMYieldToOneStorageLocation();
 
         if (bytes32($.contractPrivateKey) == bytes32(0)) revert ContractKeyNotSet();
 
         bytes memory pubKey = $.publicKeys[to];
 
-        if (pubKey.length == 0) return bytes("");
+        if (pubKey.length == 0) return (bytes32(0), bytes(""));
+
+        encryptKeyHash = keccak256(pubKey);
 
         uint256 n = ++$.encryptedEventNonce;
+
+        emit EncryptedAmountNonce(from, to, n);
 
         sbytes32 sharedSecret = _ecdh($.contractPrivateKey, pubKey);
         sbytes32 aesKey = _hkdf(sharedSecret);
         bytes12 nonce = bytes12(keccak256(abi.encode(from, to, n)));
 
-        return _aesGcmEncrypt(aesKey, nonce, abi.encode(uint256(amount)));
+        ciphertext = _aesGcmEncrypt(aesKey, nonce, abi.encode(uint256(amount)));
     }
 
     /**
@@ -563,7 +690,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         _getMYieldToOneStorageLocation().shieldedAllowance[account][spender] = amount;
 
         if (encryptEmit) {
-            emit Approval(account, spender, _encryptAmount(account, spender, amount));
+            (bytes32 encryptKeyHash, bytes memory ciphertext) = _encryptAmount(account, spender, amount);
+            emit Approval(account, spender, encryptKeyHash, ciphertext);
         } else {
             emit Approval(account, spender, amount_);
         }

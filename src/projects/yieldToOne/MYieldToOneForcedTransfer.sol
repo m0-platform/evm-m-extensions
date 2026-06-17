@@ -40,6 +40,7 @@ contract MYieldToOneForcedTransfer is MYieldToOne, ForcedTransferable {
      * @param  yieldRecipientManager The address of a yield recipient setter.
      * @param  pauser                The address of a pauser.
      * @param  forcedTransferManager  The address of a force transfer manager.
+     * @param  allowlistAdmin        The address granted the allowlist admin role (manages the allowlist-manager role).
      */
     function initialize(
         string memory name,
@@ -49,7 +50,8 @@ contract MYieldToOneForcedTransfer is MYieldToOne, ForcedTransferable {
         address freezeManager,
         address yieldRecipientManager,
         address pauser,
-        address forcedTransferManager
+        address forcedTransferManager,
+        address allowlistAdmin
     ) public virtual initializer {
         __MYieldToOneForcedTransfer_init(
             name,
@@ -59,7 +61,8 @@ contract MYieldToOneForcedTransfer is MYieldToOne, ForcedTransferable {
             freezeManager,
             yieldRecipientManager,
             pauser,
-            forcedTransferManager
+            forcedTransferManager,
+            allowlistAdmin
         );
     }
 
@@ -75,6 +78,7 @@ contract MYieldToOneForcedTransfer is MYieldToOne, ForcedTransferable {
      * @param  yieldRecipientManager The address of a yield recipient setter.
      * @param  pauser                The address of a pauser.
      * @param  forcedTransferManager  The address of a force transfer manager.
+     * @param  allowlistAdmin        The address granted the allowlist admin role (manages the allowlist-manager role).
      */
     function __MYieldToOneForcedTransfer_init(
         string memory name,
@@ -84,11 +88,21 @@ contract MYieldToOneForcedTransfer is MYieldToOne, ForcedTransferable {
         address freezeManager,
         address yieldRecipientManager,
         address pauser,
-        address forcedTransferManager
+        address forcedTransferManager,
+        address allowlistAdmin
     ) internal onlyInitializing {
         if (forcedTransferManager == address(0)) revert ZeroForcedTransferManager();
 
-        __MYieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, yieldRecipientManager, pauser);
+        __MYieldToOne_init(
+            name,
+            symbol,
+            yieldRecipient_,
+            admin,
+            freezeManager,
+            yieldRecipientManager,
+            pauser,
+            allowlistAdmin
+        );
         __ForcedTransferable_init(forcedTransferManager);
     }
 

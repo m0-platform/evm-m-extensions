@@ -42,11 +42,15 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
                     freezeManager,
                     yieldRecipientManager,
                     pauser,
-                    forcedTransferManager
+                    forcedTransferManager,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )
         );
+
+        vm.prank(allowlistAdmin);
+        mYieldToOneForcedTransfer.grantRole(ALLOWLIST_MANAGER_ROLE, admin);
 
         registrar.setEarner(address(mYieldToOneForcedTransfer), true);
     }
@@ -85,7 +89,8 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
                     freezeManager,
                     yieldRecipientManager,
                     pauser,
-                    address(0)
+                    address(0),
+                    allowlistAdmin
                 )
             )
         );
@@ -209,7 +214,7 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         assertEq(mYieldToOneForcedTransfer.getEncryptedEventNonce(), 0);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
         bytes32 forcedTopic = keccak256("ForcedTransfer(address,address,address,uint256)");
 
@@ -457,6 +462,16 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         mYieldToOneForcedTransfer.transferFrom(alice, bob, amount);
     }
 
+    /* ============ transferWithAuthorization / receiveWithAuthorization (ERC-3009, inherited) ============ */
+
+    function test_authorizationTransfersRevert() public {
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOneForcedTransfer.transferWithAuthorization(alice, bob, 1_000e6, 0, type(uint256).max, bytes32(0), "");
+
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOneForcedTransfer.receiveWithAuthorization(alice, bob, 1_000e6, 0, type(uint256).max, bytes32(0), "");
+    }
+
     /* ============ balanceOf ============ */
 
     function test_balanceOf_allowlistedInfraCanReadAnyHolder() public {
@@ -553,8 +568,8 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         vm.prank(bob);
         mYieldToOneForcedTransfer.registerPublicKey(_validPubKey(0xBB));
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
 
         vm.prank(alice);
         mYieldToOneForcedTransfer.transfer(bob, suint256(amount));
@@ -577,8 +592,8 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         vm.prank(alice);
         mYieldToOneForcedTransfer.approve(carol, suint256(amount));
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
 
         vm.prank(carol);
         mYieldToOneForcedTransfer.transferFrom(alice, bob, suint256(amount));
@@ -597,8 +612,8 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         vm.prank(bob);
         mYieldToOneForcedTransfer.registerPublicKey(_validPubKey(0xBB));
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Approval(alice, bob, hex"deadbeefcafebabe");
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Approval(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
 
         vm.prank(alice);
         mYieldToOneForcedTransfer.approve(bob, suint256(amount));

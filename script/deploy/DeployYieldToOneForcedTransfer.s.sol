@@ -19,6 +19,7 @@ contract DeployYieldToOneForcedTransfer is DeployBase {
         extensionConfig.yieldRecipientManager = vm.envAddress("YIELD_RECIPIENT_MANAGER");
         extensionConfig.pauser = vm.envAddress("PAUSER");
         extensionConfig.forcedTransferManager = vm.envAddress("FORCED_TRANSFER_MANAGER");
+        extensionConfig.allowlistAdmin = vm.envAddress("ALLOWLIST_ADMIN");
 
         // Verify predicted address (if PREDICTED_ADDRESS env var is set)
         if (_shouldVerifyPredictedAddress()) {

@@ -31,6 +31,7 @@ contract Config {
         address freezeManager;
         address yieldRecipientManager;
         address pauser;
+        address allowlistAdmin;
     }
 
     struct YieldToOneForcedTransferConfig {
@@ -43,6 +44,7 @@ contract Config {
         address yieldRecipientManager;
         address pauser;
         address forcedTransferManager;
+        address allowlistAdmin;
     }
 
     struct JMIExtensionConfig {
@@ -55,6 +57,7 @@ contract Config {
         address freezeManager;
         address pauser;
         address yieldRecipientManager;
+        address allowlistAdmin;
     }
 
     struct YieldToAllWithFeeConfig {
@@ -97,7 +100,8 @@ contract Config {
     uint256 public constant BASE_SEPOLIA_CHAIN_ID = 84532;
     uint256 public constant SEISMIC_TESTNET_CHAIN_ID = 5124;
 
-    address public constant DEPLOYER = 0x12b1A4226ba7D9Ad492779c924b0fC00BDCb6217;
+    address public constant DEPLOYER = 0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB;
+    address public constant TESTNET_OWNER = 0x12b1A4226ba7D9Ad492779c924b0fC00BDCb6217;
 
     address public constant M_TOKEN = 0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b;
     address public constant WRAPPED_M_TOKEN = 0x437cc33344a0B27A429f795ff6B469C72698B291;

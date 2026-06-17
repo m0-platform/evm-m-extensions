@@ -35,7 +35,10 @@ contract ConfigureSeismicExtension is ScriptBase {
 
         vm.stopBroadcast();
 
-        console.log("Extension approved on SwapFacility:", extension);
+        for (uint256 i; i < infra.length; ++i) {
+            require(IMYieldToOne(extension).isAllowlisted(infra[i]), "allowlist failed");
+        }
+
         console.log("Allowlisted Portal:", infra[0]);
         if (limitOrderProtocol != address(0)) console.log("Allowlisted LimitOrderProtocol:", limitOrderProtocol);
     }

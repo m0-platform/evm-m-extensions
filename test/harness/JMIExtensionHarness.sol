@@ -16,7 +16,8 @@ contract JMIExtensionHarness is JMIExtension {
         address assetCapManager,
         address freezeManager,
         address pauser,
-        address yieldRecipientManager
+        address yieldRecipientManager,
+        address allowlistAdmin
     ) public override initializer {
         super.initialize(
             name,
@@ -26,7 +27,8 @@ contract JMIExtensionHarness is JMIExtension {
             assetCapManager,
             freezeManager,
             pauser,
-            yieldRecipientManager
+            yieldRecipientManager,
+            allowlistAdmin
         );
     }
 

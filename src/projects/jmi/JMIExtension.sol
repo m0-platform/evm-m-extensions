@@ -105,6 +105,7 @@ contract JMIExtension is IJMIExtension, JMIExtensionLayout, MYieldToOne {
      * @param freezeManager         The address of a freeze manager.
      * @param pauser                The address of a pauser.
      * @param yieldRecipientManager The address of a yield recipient manager.
+     * @param allowlistAdmin        The address granted the allowlist admin role (manages the allowlist-manager role).
      */
     function initialize(
         string memory name,
@@ -114,7 +115,8 @@ contract JMIExtension is IJMIExtension, JMIExtensionLayout, MYieldToOne {
         address assetCapManager,
         address freezeManager,
         address pauser,
-        address yieldRecipientManager
+        address yieldRecipientManager,
+        address allowlistAdmin
     ) public virtual initializer {
         __JMIExtension_init(
             name,
@@ -124,7 +126,8 @@ contract JMIExtension is IJMIExtension, JMIExtensionLayout, MYieldToOne {
             assetCapManager,
             freezeManager,
             pauser,
-            yieldRecipientManager
+            yieldRecipientManager,
+            allowlistAdmin
         );
     }
 
@@ -138,6 +141,7 @@ contract JMIExtension is IJMIExtension, JMIExtensionLayout, MYieldToOne {
      * @param freezeManager         The address of a freeze manager.
      * @param pauser                The address of a pauser.
      * @param yieldRecipientManager The address of a yield recipient setter.
+     * @param allowlistAdmin        The address granted the allowlist admin role (manages the allowlist-manager role).
      */
     function __JMIExtension_init(
         string memory name,
@@ -147,11 +151,21 @@ contract JMIExtension is IJMIExtension, JMIExtensionLayout, MYieldToOne {
         address assetCapManager,
         address freezeManager,
         address pauser,
-        address yieldRecipientManager
+        address yieldRecipientManager,
+        address allowlistAdmin
     ) internal onlyInitializing {
         if (assetCapManager == address(0)) revert ZeroAssetCapManager();
 
-        __MYieldToOne_init(name, symbol, yieldRecipient, admin, freezeManager, yieldRecipientManager, pauser);
+        __MYieldToOne_init(
+            name,
+            symbol,
+            yieldRecipient,
+            admin,
+            freezeManager,
+            yieldRecipientManager,
+            pauser,
+            allowlistAdmin
+        );
 
         _grantRole(ASSET_CAP_MANAGER_ROLE, assetCapManager);
     }

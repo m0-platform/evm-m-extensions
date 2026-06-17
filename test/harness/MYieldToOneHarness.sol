@@ -15,9 +15,19 @@ contract MYieldToOneHarness is MYieldToOne {
         address admin,
         address freezeManager,
         address yieldRecipientManager,
-        address pauser
+        address pauser,
+        address allowlistAdmin
     ) public override initializer {
-        super.initialize(name, symbol, yieldRecipient, admin, freezeManager, yieldRecipientManager, pauser);
+        super.initialize(
+            name,
+            symbol,
+            yieldRecipient,
+            admin,
+            freezeManager,
+            yieldRecipientManager,
+            pauser,
+            allowlistAdmin
+        );
     }
 
     function setBalanceOf(address account, uint256 amount) external {

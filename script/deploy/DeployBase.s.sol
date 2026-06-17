@@ -138,16 +138,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
         proxy = _deployCreate3TransparentProxy(
             implementation,
             extensionConfig.admin,
-            abi.encodeWithSelector(
-                MYieldToOne.initialize.selector,
-                extensionConfig.extensionName,
-                extensionConfig.symbol,
-                extensionConfig.yieldRecipient,
-                extensionConfig.admin,
-                extensionConfig.freezeManager,
-                extensionConfig.yieldRecipientManager,
-                extensionConfig.pauser
-            ),
+            _yieldToOneInitData(extensionConfig),
             _computeSalt(deployer, extensionConfig.contractName)
         );
 
@@ -165,17 +156,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
         proxy = _deployCreate3TransparentProxy(
             implementation,
             extensionConfig.admin,
-            abi.encodeWithSelector(
-                MYieldToOneForcedTransfer.initialize.selector,
-                extensionConfig.extensionName,
-                extensionConfig.symbol,
-                extensionConfig.yieldRecipient,
-                extensionConfig.admin,
-                extensionConfig.freezeManager,
-                extensionConfig.yieldRecipientManager,
-                extensionConfig.pauser,
-                extensionConfig.forcedTransferManager
-            ),
+            _yieldToOneForcedTransferInitData(extensionConfig),
             _computeSalt(deployer, extensionConfig.contractName)
         );
 
@@ -193,21 +174,60 @@ contract DeployBase is DeployHelpers, ScriptBase {
         proxy = _deployCreate3TransparentProxy(
             implementation,
             extensionConfig.admin,
-            abi.encodeWithSelector(
-                JMIExtension.initialize.selector,
-                extensionConfig.extensionName,
-                extensionConfig.symbol,
-                extensionConfig.yieldRecipient,
-                extensionConfig.admin,
-                extensionConfig.assetCapManager,
-                extensionConfig.freezeManager,
-                extensionConfig.pauser,
-                extensionConfig.yieldRecipientManager
-            ),
+            _jmiExtensionInitData(extensionConfig),
             _computeSalt(deployer, extensionConfig.contractName)
         );
 
         proxyAdmin = Upgrades.getAdminAddress(proxy);
+    }
+
+    function _yieldToOneInitData(YieldToOneConfig memory c) private pure returns (bytes memory) {
+        return
+            abi.encodeWithSelector(
+                MYieldToOne.initialize.selector,
+                c.extensionName,
+                c.symbol,
+                c.yieldRecipient,
+                c.admin,
+                c.freezeManager,
+                c.yieldRecipientManager,
+                c.pauser,
+                c.allowlistAdmin
+            );
+    }
+
+    function _yieldToOneForcedTransferInitData(
+        YieldToOneForcedTransferConfig memory c
+    ) private pure returns (bytes memory) {
+        return
+            abi.encodeWithSelector(
+                MYieldToOneForcedTransfer.initialize.selector,
+                c.extensionName,
+                c.symbol,
+                c.yieldRecipient,
+                c.admin,
+                c.freezeManager,
+                c.yieldRecipientManager,
+                c.pauser,
+                c.forcedTransferManager,
+                c.allowlistAdmin
+            );
+    }
+
+    function _jmiExtensionInitData(JMIExtensionConfig memory c) private pure returns (bytes memory) {
+        return
+            abi.encodeWithSelector(
+                JMIExtension.initialize.selector,
+                c.extensionName,
+                c.symbol,
+                c.yieldRecipient,
+                c.admin,
+                c.assetCapManager,
+                c.freezeManager,
+                c.pauser,
+                c.yieldRecipientManager,
+                c.allowlistAdmin
+            );
     }
 
     function _deployYieldToAllWithFee(

@@ -117,7 +117,7 @@ RECEIPT=$(scast send "$EXTENSION" "transfer(address,suint256)" $BOB $TRANSFER_AM
     --private-key $ALICE_KEY --rpc-url "$RPC" --seismic --json)
 [ "$(echo "$RECEIPT" | json_get "['status']")" = "0x1" ] || fail "shielded transfer reverted"
 [ "$(echo "$RECEIPT" | json_get "['type']")" = "0x4a" ] || fail "transfer was not TxSeismic"
-TRANSFER_BYTES_TOPIC=$(scast keccak "Transfer(address,address,bytes)")
+TRANSFER_BYTES_TOPIC=$(scast keccak "Transfer(address,address,bytes32,bytes)")
 CIPHERTEXT=$(echo "$RECEIPT" | python3 -c "
 import json, sys
 raw = sys.stdin.read()

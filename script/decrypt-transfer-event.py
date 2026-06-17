@@ -20,8 +20,11 @@ USAGE
   --peer-pubkey    the OTHER party's 33-byte compressed public key
   --from           event `from` topic (sender / approver) — bound into the nonce
   --to             event `to` topic (recipient / spender) — bound into the nonce
-  --nonce-counter  the contract's encryptedEventNonce value used for this emit (1-based)
-  --scan           try counters 1..max-n until the GCM tag verifies (when the counter is unknown)
+  --nonce-counter  the encryptedEventNonce for this emit (1-based) — read it straight from the
+                   `EncryptedAmountNonce(from, to, nonce)` event the contract emits alongside the
+                   ciphertext; preferred over --scan
+  --scan           legacy fallback: try counters 1..max-n until the GCM tag verifies, for ciphertexts
+                   from logs that predate the EncryptedAmountNonce event (when the counter is unknown)
   --ciphertext     event payload hex (ciphertext || 16-byte tag)
   --self-test      verify against vectors pinned from the Seismic precompiles (sforge mercury EVM)
 
