@@ -52,7 +52,8 @@ contract SwapFacilityIntegrationTest is BaseIntegrationTest, UpgradeBase {
                     admin,
                     freezeManager,
                     yieldRecipientManager,
-                    pauser
+                    pauser,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )
@@ -91,7 +92,8 @@ contract SwapFacilityIntegrationTest is BaseIntegrationTest, UpgradeBase {
                     assetCapManager,
                     freezeManager,
                     pauser,
-                    yieldRecipientManager
+                    yieldRecipientManager,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )

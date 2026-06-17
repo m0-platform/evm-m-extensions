@@ -16,7 +16,8 @@ contract MYieldToOneForcedTransferHarness is MYieldToOneForcedTransfer {
         address admin,
         address freezeManager,
         address pauser,
-        address forcedTransferManager
+        address forcedTransferManager,
+        address allowlistAdmin
     ) public override initializer {
         super.initialize(
             name,
@@ -26,7 +27,8 @@ contract MYieldToOneForcedTransferHarness is MYieldToOneForcedTransfer {
             admin,
             freezeManager,
             pauser,
-            forcedTransferManager
+            forcedTransferManager,
+            allowlistAdmin
         );
     }
 

@@ -47,7 +47,8 @@ contract SanvilStack is Script {
                         deployer, // freezeManager
                         deployer, // yieldRecipientManager
                         deployer, // pauser
-                        deployer // forcedTransferManager
+                        deployer, // forcedTransferManager
+                        deployer // allowlistAdmin
                     )
                 )
             )

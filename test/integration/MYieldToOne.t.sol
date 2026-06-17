@@ -37,7 +37,8 @@ contract MYieldToOneIntegrationTests is BaseIntegrationTest {
                     admin,
                     freezeManager,
                     yieldRecipientManager,
-                    pauser
+                    pauser,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )

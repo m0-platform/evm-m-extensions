@@ -67,11 +67,15 @@ contract JMIExtensionUnitTests is BaseUnitTest {
                     assetCapManager,
                     freezeManager,
                     pauser,
-                    yieldRecipientManager
+                    yieldRecipientManager,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )
         );
+
+        vm.prank(allowlistAdmin);
+        jmi.grantRole(ALLOWLIST_MANAGER_ROLE, admin);
 
         vm.prank(assetCapManager);
         jmi.setAssetCap(address(mockUSDC), mockUSDCCap);
@@ -147,7 +151,8 @@ contract JMIExtensionUnitTests is BaseUnitTest {
                     address(0),
                     freezeManager,
                     pauser,
-                    yieldRecipientManager
+                    yieldRecipientManager,
+                    allowlistAdmin
                 )
             )
         );

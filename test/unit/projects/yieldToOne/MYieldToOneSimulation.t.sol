@@ -41,13 +41,17 @@ contract MYieldToOneSimulationTests is BaseUnitTest {
                     freezeManager,
                     yieldRecipientManager,
                     pauser,
-                    forcedTransferManager
+                    forcedTransferManager,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )
         );
 
         registrar.setEarner(address(mYieldToOne), true);
+
+        vm.prank(allowlistAdmin);
+        mYieldToOne.grantRole(ALLOWLIST_MANAGER_ROLE, admin);
 
         vm.prank(admin);
         mYieldToOne.setAllowlisted(infra, true);

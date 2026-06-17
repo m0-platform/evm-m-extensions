@@ -75,11 +75,15 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
                     admin,
                     freezeManager,
                     yieldRecipientManager,
-                    pauser
+                    pauser,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )
         );
+
+        vm.prank(allowlistAdmin);
+        mYieldToOne.grantRole(ALLOWLIST_MANAGER_ROLE, admin);
 
         mYieldFee = MYieldFeeHarness(
             Upgrades.deployTransparentProxy(

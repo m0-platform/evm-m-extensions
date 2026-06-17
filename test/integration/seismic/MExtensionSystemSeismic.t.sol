@@ -68,7 +68,8 @@ contract MExtensionSystemSeismicIntegrationTests is BaseUnitTest {
                     freezeManager,
                     yieldRecipientManager,
                     pauser,
-                    forcedTransferManager
+                    forcedTransferManager,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )

@@ -46,11 +46,15 @@ contract MYieldToOneUnitTests is BaseUnitTest {
                     admin,
                     freezeManager,
                     yieldRecipientManager,
-                    pauser
+                    pauser,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )
         );
+
+        vm.prank(allowlistAdmin);
+        mYieldToOne.grantRole(ALLOWLIST_MANAGER_ROLE, admin);
 
         registrar.setEarner(address(mYieldToOne), true);
     }
@@ -69,6 +73,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertTrue(mYieldToOne.hasRole(FREEZE_MANAGER_ROLE, freezeManager));
         assertTrue(mYieldToOne.hasRole(YIELD_RECIPIENT_MANAGER_ROLE, yieldRecipientManager));
         assertTrue(mYieldToOne.hasRole(PAUSER_ROLE, pauser));
+        assertTrue(mYieldToOne.hasRole(ALLOWLIST_ADMIN_ROLE, allowlistAdmin));
+        assertEq(mYieldToOne.getRoleAdmin(ALLOWLIST_MANAGER_ROLE), ALLOWLIST_ADMIN_ROLE);
     }
 
     function test_initialize_zeroYieldRecipient() external {
@@ -87,7 +93,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
                     admin,
                     freezeManager,
                     yieldRecipientManager,
-                    pauser
+                    pauser,
+                    allowlistAdmin
                 )
             )
         );
@@ -109,7 +116,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
                     address(0),
                     freezeManager,
                     yieldRecipientManager,
-                    pauser
+                    pauser,
+                    allowlistAdmin
                 )
             )
         );
@@ -131,7 +139,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
                     admin,
                     freezeManager,
                     address(0),
-                    pauser
+                    pauser,
+                    allowlistAdmin
                 )
             )
         );
@@ -153,17 +162,75 @@ contract MYieldToOneUnitTests is BaseUnitTest {
                     admin,
                     freezeManager,
                     yieldRecipientManager,
+                    address(0),
+                    allowlistAdmin
+                )
+            )
+        );
+    }
+
+    function test_initialize_zeroAllowlistAdmin() external {
+        address implementation = address(new MYieldToOneHarness(address(mToken), address(swapFacility)));
+
+        vm.expectRevert(IMYieldToOne.ZeroAllowlistAdmin.selector);
+        MYieldToOneHarness(
+            UnsafeUpgrades.deployTransparentProxy(
+                implementation,
+                admin,
+                abi.encodeWithSelector(
+                    MYieldToOne.initialize.selector,
+                    NAME,
+                    SYMBOL,
+                    yieldRecipient,
+                    admin,
+                    freezeManager,
+                    yieldRecipientManager,
+                    pauser,
                     address(0)
                 )
             )
         );
     }
 
+    /* ============ ALLOWLIST_MANAGER_ROLE delegation ============ */
+
+    function test_setAllowlisted_allowlistAdminCanGrantManager() public {
+        address operator = makeAddr("allowlistOperator");
+
+        vm.prank(allowlistAdmin);
+        mYieldToOne.grantRole(ALLOWLIST_MANAGER_ROLE, operator);
+
+        vm.expectEmit();
+        emit IMYieldToOne.AllowlistSet(bob, true);
+
+        vm.prank(operator);
+        mYieldToOne.setAllowlisted(bob, true);
+
+        assertTrue(mYieldToOne.isAllowlisted(bob));
+    }
+
+    function test_setAllowlisted_defaultAdminCannotGrantManager() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                admin,
+                ALLOWLIST_ADMIN_ROLE
+            )
+        );
+
+        vm.prank(admin);
+        mYieldToOne.grantRole(ALLOWLIST_MANAGER_ROLE, carol);
+    }
+
     /* ============ setAllowlisted ============ */
 
-    function test_setAllowlisted_onlyAdmin() public {
+    function test_setAllowlisted_onlyAllowlistManager() public {
         vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, DEFAULT_ADMIN_ROLE)
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                ALLOWLIST_MANAGER_ROLE
+            )
         );
 
         vm.prank(alice);
@@ -224,13 +291,17 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
     /* ============ setAllowlisted (batch) ============ */
 
-    function test_setAllowlisted_batchOnlyAdmin() public {
+    function test_setAllowlisted_batchOnlyAllowlistManager() public {
         address[] memory infra = new address[](2);
         infra[0] = bob;
         infra[1] = carol;
 
         vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, DEFAULT_ADMIN_ROLE)
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                ALLOWLIST_MANAGER_ROLE
+            )
         );
 
         vm.prank(alice);

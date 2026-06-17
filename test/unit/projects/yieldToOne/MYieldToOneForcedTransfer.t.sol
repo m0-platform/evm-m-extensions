@@ -42,11 +42,15 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
                     freezeManager,
                     yieldRecipientManager,
                     pauser,
-                    forcedTransferManager
+                    forcedTransferManager,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )
         );
+
+        vm.prank(allowlistAdmin);
+        mYieldToOneForcedTransfer.grantRole(ALLOWLIST_MANAGER_ROLE, admin);
 
         registrar.setEarner(address(mYieldToOneForcedTransfer), true);
     }
@@ -85,7 +89,8 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
                     freezeManager,
                     yieldRecipientManager,
                     pauser,
-                    address(0)
+                    address(0),
+                    allowlistAdmin
                 )
             )
         );

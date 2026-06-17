@@ -81,6 +81,9 @@ interface IMYieldToOne {
     /// @notice Emitted in initializer if Admin is 0x0.
     error ZeroAdmin();
 
+    /// @notice Emitted in initializer if Allowlist Admin is 0x0.
+    error ZeroAllowlistAdmin();
+
     /// @notice Emitted when a gated read (`balanceOf` / `allowance`) is called by an unauthorized account.
     error Unauthorized();
 
@@ -132,7 +135,7 @@ interface IMYieldToOne {
 
     /**
      * @notice Adds or removes `account` from the infra allowlist.
-     * @dev    MUST only be callable by the DEFAULT_ADMIN_ROLE.
+     * @dev    MUST only be callable by the ALLOWLIST_MANAGER_ROLE.
      * @dev    Allowlisted addresses MUST be audited M0 infra contracts, never EOAs or contracts re-exposing `balanceOf`.
      * @dev    Grants native `approve` (as spender) and `transferFrom` (as caller) paths and ungated `balanceOf` reads.
      * @dev    SHOULD revert if `account` is 0x0. SHOULD return early if the status is unchanged.
@@ -143,7 +146,7 @@ interface IMYieldToOne {
 
     /**
      * @notice Adds or removes a batch of accounts from the infra allowlist.
-     * @dev    MUST only be callable by the DEFAULT_ADMIN_ROLE.
+     * @dev    MUST only be callable by the ALLOWLIST_MANAGER_ROLE.
      * @dev    Reverts atomically (the whole batch) if any `accounts` entry is the zero address.
      * @param  accounts The addresses whose allowlist status is being set.
      * @param  status   The new allowlist status applied to every address in `accounts`.
@@ -201,6 +204,12 @@ interface IMYieldToOne {
 
     /// @notice The role that can manage the yield recipient.
     function YIELD_RECIPIENT_MANAGER_ROLE() external view returns (bytes32);
+
+    /// @notice The role that can set the infra allowlist (via `setAllowlisted`).
+    function ALLOWLIST_MANAGER_ROLE() external view returns (bytes32);
+
+    /// @notice The role that administers the `ALLOWLIST_MANAGER_ROLE` (grants/revokes it).
+    function ALLOWLIST_ADMIN_ROLE() external view returns (bytes32);
 
     /// @notice The amount of accrued yield.
     function yield() external view returns (uint256);

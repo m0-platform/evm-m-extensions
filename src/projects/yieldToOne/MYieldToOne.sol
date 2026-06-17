@@ -22,7 +22,7 @@ abstract contract MYieldToOneStorageLayout {
         mapping(address account => mapping(address spender => suint256 allowance)) shieldedAllowance;
         mapping(address account => bool isAllowlisted) allowlist;
         mapping(address account => bytes publicKey) publicKeys;
-        bytes _contractPublicKey;
+        bytes contractPublicKey;
         // Set once via `setContractKey` (TxSeismic 0x4A only); no getter exposes it.
         sbytes32 contractPrivateKey;
         // Monotonic counter feeding the per-emit AES-GCM nonce; pre-incremented so nonces never repeat.
@@ -52,6 +52,12 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
     /// @inheritdoc IMYieldToOne
     bytes32 public constant YIELD_RECIPIENT_MANAGER_ROLE = keccak256("YIELD_RECIPIENT_MANAGER_ROLE");
 
+    /// @inheritdoc IMYieldToOne
+    bytes32 public constant ALLOWLIST_MANAGER_ROLE = keccak256("ALLOWLIST_MANAGER_ROLE");
+
+    /// @inheritdoc IMYieldToOne
+    bytes32 public constant ALLOWLIST_ADMIN_ROLE = keccak256("ALLOWLIST_ADMIN_ROLE");
+
     /* ============ Constructor ============ */
 
     /**
@@ -74,6 +80,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
      * @param freezeManager         The address of a freeze manager.
      * @param yieldRecipientManager The address of a yield recipient setter.
      * @param pauser                The address of a pauser.
+     * @param allowlistAdmin        The address granted the allowlist admin role (manages the allowlist-manager role).
      */
     function initialize(
         string memory name,
@@ -82,9 +89,19 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         address admin,
         address freezeManager,
         address yieldRecipientManager,
-        address pauser
+        address pauser,
+        address allowlistAdmin
     ) public virtual initializer {
-        __MYieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, yieldRecipientManager, pauser);
+        __MYieldToOne_init(
+            name,
+            symbol,
+            yieldRecipient_,
+            admin,
+            freezeManager,
+            yieldRecipientManager,
+            pauser,
+            allowlistAdmin
+        );
     }
 
     /**
@@ -96,6 +113,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
      * @param freezeManager         The address of a freeze manager.
      * @param yieldRecipientManager The address of a yield recipient setter.
      * @param pauser                The address of a pauser.
+     * @param allowlistAdmin        The address granted the allowlist admin role (manages the allowlist-manager role).
      */
     function __MYieldToOne_init(
         string memory name,
@@ -104,10 +122,12 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         address admin,
         address freezeManager,
         address yieldRecipientManager,
-        address pauser
+        address pauser,
+        address allowlistAdmin
     ) internal onlyInitializing {
         if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
         if (admin == address(0)) revert ZeroAdmin();
+        if (allowlistAdmin == address(0)) revert ZeroAllowlistAdmin();
 
         __MExtension_init(name, symbol);
         __Freezable_init(freezeManager);
@@ -115,8 +135,13 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
 
         _setYieldRecipient(yieldRecipient_);
 
+        // The allowlist manager (who calls `setAllowlisted`) is administered by a dedicated allowlist
+        // admin rather than the DEFAULT_ADMIN_ROLE, so allowlist control can be delegated independently.
+        _setRoleAdmin(ALLOWLIST_MANAGER_ROLE, ALLOWLIST_ADMIN_ROLE);
+
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(YIELD_RECIPIENT_MANAGER_ROLE, yieldRecipientManager);
+        _grantRole(ALLOWLIST_ADMIN_ROLE, allowlistAdmin);
     }
 
     /* ============ Interactive Functions ============ */
@@ -145,12 +170,15 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
     }
 
     /// @inheritdoc IMYieldToOne
-    function setAllowlisted(address account, bool status) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setAllowlisted(address account, bool status) external virtual onlyRole(ALLOWLIST_MANAGER_ROLE) {
         _setAllowlisted(account, status);
     }
 
     /// @inheritdoc IMYieldToOne
-    function setAllowlisted(address[] calldata accounts, bool status) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setAllowlisted(
+        address[] calldata accounts,
+        bool status
+    ) external virtual onlyRole(ALLOWLIST_MANAGER_ROLE) {
         for (uint256 i; i < accounts.length; ++i) {
             _setAllowlisted(accounts[i], status);
         }
@@ -171,7 +199,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         if (bytes32($.contractPrivateKey) != bytes32(0)) revert ContractKeyAlreadySet();
 
         $.contractPrivateKey = privateKey;
-        $._contractPublicKey = publicKey;
+        $.contractPublicKey = publicKey;
 
         emit ContractKeySet(publicKey);
     }
@@ -313,7 +341,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
 
     /// @inheritdoc IMYieldToOne
     function contractPublicKey() external view returns (bytes memory) {
-        return _getMYieldToOneStorageLocation()._contractPublicKey;
+        return _getMYieldToOneStorageLocation().contractPublicKey;
     }
 
     /* ============ Hooks For Internal Interactive Functions ============ */

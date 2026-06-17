@@ -41,7 +41,8 @@ contract UniswapV3SwapAdapterIntegrationTest is BaseIntegrationTest {
                     admin,
                     freezeManager,
                     yieldRecipientManager,
-                    pauser
+                    pauser,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )

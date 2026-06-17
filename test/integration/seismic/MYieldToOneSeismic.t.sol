@@ -54,7 +54,8 @@ contract MYieldToOneSeismicIntegrationTests is BaseUnitTest {
                     admin,
                     freezeManager,
                     yieldRecipientManager,
-                    pauser
+                    pauser,
+                    allowlistAdmin
                 ),
                 mExtensionDeployOptions
             )
