@@ -462,6 +462,16 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         mYieldToOneForcedTransfer.transferFrom(alice, bob, amount);
     }
 
+    /* ============ transferWithAuthorization / receiveWithAuthorization (ERC-3009, inherited) ============ */
+
+    function test_authorizationTransfersRevert() public {
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOneForcedTransfer.transferWithAuthorization(alice, bob, 1_000e6, 0, type(uint256).max, bytes32(0), "");
+
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOneForcedTransfer.receiveWithAuthorization(alice, bob, 1_000e6, 0, type(uint256).max, bytes32(0), "");
+    }
+
     /* ============ balanceOf ============ */
 
     function test_balanceOf_allowlistedInfraCanReadAnyHolder() public {

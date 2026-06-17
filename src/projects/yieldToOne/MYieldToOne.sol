@@ -3,8 +3,10 @@
 pragma solidity ^0.8.26;
 
 import { ERC20ExtendedUpgradeable } from "../../../lib/common/src/ERC20ExtendedUpgradeable.sol";
+import { ERC3009Upgradeable } from "../../../lib/common/src/ERC3009Upgradeable.sol";
 import { IERC20 } from "../../../lib/common/src/interfaces/IERC20.sol";
 import { IERC20Extended } from "../../../lib/common/src/interfaces/IERC20Extended.sol";
+import { IERC3009 } from "../../../lib/common/src/interfaces/IERC3009.sol";
 
 import { IMYieldToOne } from "./interfaces/IMYieldToOne.sol";
 
@@ -284,6 +286,93 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         bytes memory /* signature */
     ) external pure override(ERC20ExtendedUpgradeable, IERC20Extended) {
         revert UseShieldedApprove();
+    }
+
+    // ERC-3009 transfer/receive hard-code a plaintext `uint256 value`, so they cannot be shielded. Disable
+    // them (mirroring the `permit` reverts above) to keep amounts off the public, encryption-bypassing path.
+
+    /// @inheritdoc IERC3009
+    function transferWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        bytes memory /* signature */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
+    /// @inheritdoc IERC3009
+    function transferWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        bytes32 /* r */,
+        bytes32 /* vs */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
+    /// @inheritdoc IERC3009
+    function transferWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        uint8 /* v */,
+        bytes32 /* r */,
+        bytes32 /* s */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
+    /// @inheritdoc IERC3009
+    function receiveWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        bytes memory /* signature */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
+    /// @inheritdoc IERC3009
+    function receiveWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        bytes32 /* r */,
+        bytes32 /* vs */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
+    }
+
+    /// @inheritdoc IERC3009
+    function receiveWithAuthorization(
+        address /* from */,
+        address /* to */,
+        uint256 /* value */,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        uint8 /* v */,
+        bytes32 /* r */,
+        bytes32 /* s */
+    ) external pure override(ERC3009Upgradeable, IERC3009) {
+        revert UseShieldedTransfer();
     }
 
     /* ============ View/Pure Functions ============ */

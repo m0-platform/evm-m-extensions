@@ -728,6 +728,116 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.getShieldedAllowance(alice, carol), 0);
     }
 
+    /* ============ transferWithAuthorization / receiveWithAuthorization (ERC-3009) ============ */
+
+    function test_transferWithAuthorization_reverts() public {
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOne.transferWithAuthorization(alice, bob, 1_000e6, 0, type(uint256).max, bytes32(0), "");
+
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOne.transferWithAuthorization(
+            alice,
+            bob,
+            1_000e6,
+            0,
+            type(uint256).max,
+            bytes32(0),
+            bytes32(0),
+            bytes32(0)
+        );
+
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOne.transferWithAuthorization(
+            alice,
+            bob,
+            1_000e6,
+            0,
+            type(uint256).max,
+            bytes32(0),
+            uint8(0),
+            bytes32(0),
+            bytes32(0)
+        );
+    }
+
+    function test_receiveWithAuthorization_reverts() public {
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOne.receiveWithAuthorization(alice, bob, 1_000e6, 0, type(uint256).max, bytes32(0), "");
+
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOne.receiveWithAuthorization(
+            alice,
+            bob,
+            1_000e6,
+            0,
+            type(uint256).max,
+            bytes32(0),
+            bytes32(0),
+            bytes32(0)
+        );
+
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOne.receiveWithAuthorization(
+            alice,
+            bob,
+            1_000e6,
+            0,
+            type(uint256).max,
+            bytes32(0),
+            uint8(0),
+            bytes32(0),
+            bytes32(0)
+        );
+    }
+
+    function test_transferWithAuthorization_revertsWithValidSignature() public {
+        uint256 amount = 1_000e6;
+        uint256 validBefore = type(uint256).max;
+        bytes32 nonce = keccak256("transfer-nonce");
+
+        mYieldToOne.setBalanceOf(alice, amount);
+        vm.warp(1 days);
+
+        (uint8 v, bytes32 r, bytes32 s) = _signAuthorization(
+            mYieldToOne.TRANSFER_WITH_AUTHORIZATION_TYPEHASH(),
+            alice,
+            bob,
+            amount,
+            0,
+            validBefore,
+            nonce,
+            aliceKey
+        );
+
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+        mYieldToOne.transferWithAuthorization(alice, bob, amount, 0, validBefore, nonce, v, r, s);
+    }
+
+    function test_receiveWithAuthorization_revertsWithValidSignature() public {
+        uint256 amount = 1_000e6;
+        uint256 validBefore = type(uint256).max;
+        bytes32 nonce = keccak256("receive-nonce");
+
+        mYieldToOne.setBalanceOf(alice, amount);
+        vm.warp(1 days);
+
+        (uint8 v, bytes32 r, bytes32 s) = _signAuthorization(
+            mYieldToOne.RECEIVE_WITH_AUTHORIZATION_TYPEHASH(),
+            alice,
+            bob,
+            amount,
+            0,
+            validBefore,
+            nonce,
+            aliceKey
+        );
+
+        vm.expectRevert(IMYieldToOne.UseShieldedTransfer.selector);
+
+        vm.prank(bob);
+        mYieldToOne.receiveWithAuthorization(alice, bob, amount, 0, validBefore, nonce, v, r, s);
+    }
+
     /* ============ balanceOf ============ */
 
     function test_balanceOf_holderCanRead() public {
@@ -1375,6 +1485,30 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     function _installContractKey() internal {
         vm.prank(admin);
         mYieldToOne.setContractKey(sbytes32(bytes32(uint256(0xC0FFEE))), _validPubKey(0xAA));
+    }
+
+    /// @dev Signs an ERC-3009 transfer/receive authorization with `signerKey` over the token's EIP-712 domain.
+    function _signAuthorization(
+        bytes32 typehash,
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        uint256 signerKey
+    ) internal view returns (uint8 v, bytes32 r, bytes32 s) {
+        return
+            vm.sign(
+                signerKey,
+                keccak256(
+                    abi.encodePacked(
+                        "\x19\x01",
+                        mYieldToOne.DOMAIN_SEPARATOR(),
+                        keccak256(abi.encode(typehash, from, to, value, validAfter, validBefore, nonce))
+                    )
+                )
+            );
     }
 
     /* ============ setContractKey ============ */
