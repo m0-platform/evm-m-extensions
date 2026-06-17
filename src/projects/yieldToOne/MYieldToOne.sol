@@ -468,7 +468,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         _beforeTransfer(sender, recipient, amount_);
 
         if (encryptEmit) {
-            emit Transfer(sender, recipient, _encryptAmount(sender, recipient, amount));
+            (bytes32 encryptKeyHash, bytes memory ciphertext) = _encryptAmount(sender, recipient, amount);
+            emit Transfer(sender, recipient, encryptKeyHash, ciphertext);
         } else {
             emit Transfer(sender, recipient, amount_);
         }
@@ -490,16 +491,23 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
      * @param  from   The counterparty address bound into the nonce derivation (sender / approver).
      * @param  to     The account whose registered key the ciphertext is encrypted to.
      * @param  amount The shielded amount to encrypt.
-     * @return The AES-GCM ciphertext, or empty bytes if `to` has not registered a key.
+     * @return encryptKeyHash `keccak256` of `to`'s registered public key, or `bytes32(0)` if `to` has no key.
+     * @return ciphertext     The AES-GCM ciphertext, or empty bytes if `to` has not registered a key.
      */
-    function _encryptAmount(address from, address to, suint256 amount) internal returns (bytes memory) {
+    function _encryptAmount(
+        address from,
+        address to,
+        suint256 amount
+    ) internal returns (bytes32 encryptKeyHash, bytes memory ciphertext) {
         MYieldToOneStorageStruct storage $ = _getMYieldToOneStorageLocation();
 
         if (bytes32($.contractPrivateKey) == bytes32(0)) revert ContractKeyNotSet();
 
         bytes memory pubKey = $.publicKeys[to];
 
-        if (pubKey.length == 0) return bytes("");
+        if (pubKey.length == 0) return (bytes32(0), bytes(""));
+
+        encryptKeyHash = keccak256(pubKey);
 
         uint256 n = ++$.encryptedEventNonce;
 
@@ -507,7 +515,7 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         sbytes32 aesKey = _hkdf(sharedSecret);
         bytes12 nonce = bytes12(keccak256(abi.encode(from, to, n)));
 
-        return _aesGcmEncrypt(aesKey, nonce, abi.encode(uint256(amount)));
+        ciphertext = _aesGcmEncrypt(aesKey, nonce, abi.encode(uint256(amount)));
     }
 
     /**
@@ -563,7 +571,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         _getMYieldToOneStorageLocation().shieldedAllowance[account][spender] = amount;
 
         if (encryptEmit) {
-            emit Approval(account, spender, _encryptAmount(account, spender, amount));
+            (bytes32 encryptKeyHash, bytes memory ciphertext) = _encryptAmount(account, spender, amount);
+            emit Approval(account, spender, encryptKeyHash, ciphertext);
         } else {
             emit Approval(account, spender, amount_);
         }

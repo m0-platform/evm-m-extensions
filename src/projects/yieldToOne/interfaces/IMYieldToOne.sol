@@ -34,19 +34,29 @@ interface IMYieldToOne {
      * @dev    Distinct `topic0` from the inherited `Transfer(address,address,uint256)` — indexers MUST track both.
      * @param  from            The address transferring the tokens.
      * @param  to              The address receiving the tokens.
+     * @param  encryptKeyHash  `keccak256` of `to`'s registered public key — the key `encryptedAmount` is encrypted
+     *                         to — or `bytes32(0)` when `to` has no registered key (empty `encryptedAmount`). Indexed
+     *                         so a recipient can tell which registered key a ciphertext is bound to (its key may have
+     *                         been overwritten via `registerPublicKey`) and select the matching private key to decrypt.
      * @param  encryptedAmount AES-GCM ciphertext of the amount; empty bytes if `to` has no registered key.
      */
-    event Transfer(address indexed from, address indexed to, bytes encryptedAmount);
+    event Transfer(address indexed from, address indexed to, bytes32 indexed encryptKeyHash, bytes encryptedAmount);
 
     /**
      * @notice Emitted by user-path shielded approvals (the `suint256` overload); the allowance is
      *         encrypted to the spender's registered key.
      * @dev    Distinct `topic0` from the inherited `Approval(address,address,uint256)` — indexers MUST track both.
-     * @param  account         The account granting the allowance.
-     * @param  spender         The account allowed to spend on behalf of `account`.
+     * @param  owner           The account granting the allowance.
+     * @param  spender         The account allowed to spend on behalf of `owner`.
+     * @param  encryptKeyHash  `keccak256` of `spender`'s registered public key — the key `encryptedAmount` is
+     *                         encrypted to — or `bytes32(0)` when `spender` has no registered key (empty
+     *                         `encryptedAmount`). Indexed so a spender can tell which registered key a ciphertext is
+     *                         bound to (its key may have been overwritten via `registerPublicKey`) and decrypt.
      * @param  encryptedAmount AES-GCM ciphertext of the allowance; empty bytes if `spender` has no registered key.
      */
-    event Approval(address indexed account, address indexed spender, bytes encryptedAmount);
+    event Approval(
+        address indexed owner, address indexed spender, bytes32 indexed encryptKeyHash, bytes encryptedAmount
+    );
 
     /**
      * @notice Emitted when the contract's encrypted-event keypair is installed; only the public key is logged.
@@ -142,7 +152,7 @@ interface IMYieldToOne {
 
     /**
      * @notice Shielded ERC20 transfer of `amount` tokens to `recipient`.
-     * @dev    Emits the encrypted-bytes `Transfer(address,address,bytes)` overload.
+     * @dev    Emits the encrypted-bytes `Transfer(address,address,bytes32,bytes)` overload.
      * @param  recipient The address receiving the tokens.
      * @param  amount    The shielded amount to transfer.
      * @return Whether or not the transfer was successful.
@@ -151,7 +161,7 @@ interface IMYieldToOne {
 
     /**
      * @notice Shielded ERC20 approval of `spender` for `amount` of the caller's tokens.
-     * @dev    Emits the encrypted-bytes `Approval(address,address,bytes)` overload.
+     * @dev    Emits the encrypted-bytes `Approval(address,address,bytes32,bytes)` overload.
      * @param  spender The address allowed to spend on behalf of `msg.sender`.
      * @param  amount  The shielded allowance; `suint256(type(uint256).max)` is an infinite, non-decrementing allowance.
      * @return Whether or not the approval was successful.
@@ -160,7 +170,7 @@ interface IMYieldToOne {
 
     /**
      * @notice Shielded ERC20 transferFrom; reads and decrements the allowance in shielded space.
-     * @dev    Emits the encrypted-bytes `Transfer(address,address,bytes)` overload.
+     * @dev    Emits the encrypted-bytes `Transfer(address,address,bytes32,bytes)` overload.
      * @param  sender    The address whose tokens are being moved.
      * @param  recipient The address receiving the tokens.
      * @param  amount    The shielded amount to transfer.

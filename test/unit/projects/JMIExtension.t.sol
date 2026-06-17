@@ -413,7 +413,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         jmi.wrap(address(mockUSDC), alice, amount);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
 
         bool foundBytes;
@@ -753,8 +753,8 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         assertEq(jmi.totalAssets(), amount);
         assertEq(jmi.totalSupply(), amount);
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, bytes(""));
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, bytes32(0), bytes(""));
 
         vm.prank(alice);
         jmi.transfer(bob, suint256(amount));

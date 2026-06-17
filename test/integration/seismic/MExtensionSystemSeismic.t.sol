@@ -32,7 +32,7 @@ import { BaseUnitTest } from "../../utils/BaseUnitTest.sol";
 ///      RELATIONAL assertions — conservation, monotonicity, typed reverts — not the fork suite's
 ///      hardcoded mainnet yield constants.
 contract MExtensionSystemSeismicIntegrationTests is BaseUnitTest {
-    bytes32 internal constant TRANSFER_BYTES_TOPIC = keccak256("Transfer(address,address,bytes)");
+    bytes32 internal constant TRANSFER_BYTES_TOPIC = keccak256("Transfer(address,address,bytes32,bytes)");
 
     // Non-round index so the sibling extension's principal math runs on a realistic value.
     uint128 internal constant _M_INDEX = 1_100000068703;
@@ -206,7 +206,7 @@ contract MExtensionSystemSeismicIntegrationTests is BaseUnitTest {
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(amount_));
 
-        // A real encrypted `Transfer(address,address,bytes)` is emitted to the registered recipient,
+        // A real encrypted `Transfer(address,address,bytes32,bytes)` is emitted to the registered recipient,
         // with non-empty ciphertext, and the per-emit nonce advances.
         bytes memory ciphertext_ = _extractPayload(TRANSFER_BYTES_TOPIC, alice, bob);
         assertGt(ciphertext_.length, 0);

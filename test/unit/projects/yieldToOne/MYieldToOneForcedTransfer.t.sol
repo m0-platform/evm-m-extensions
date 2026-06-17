@@ -209,7 +209,7 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         assertEq(mYieldToOneForcedTransfer.getEncryptedEventNonce(), 0);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
         bytes32 forcedTopic = keccak256("ForcedTransfer(address,address,address,uint256)");
 
@@ -553,8 +553,8 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         vm.prank(bob);
         mYieldToOneForcedTransfer.registerPublicKey(_validPubKey(0xBB));
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
 
         vm.prank(alice);
         mYieldToOneForcedTransfer.transfer(bob, suint256(amount));
@@ -577,8 +577,8 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         vm.prank(alice);
         mYieldToOneForcedTransfer.approve(carol, suint256(amount));
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
 
         vm.prank(carol);
         mYieldToOneForcedTransfer.transferFrom(alice, bob, suint256(amount));
@@ -597,8 +597,8 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         vm.prank(bob);
         mYieldToOneForcedTransfer.registerPublicKey(_validPubKey(0xBB));
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Approval(alice, bob, hex"deadbeefcafebabe");
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Approval(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
 
         vm.prank(alice);
         mYieldToOneForcedTransfer.approve(bob, suint256(amount));

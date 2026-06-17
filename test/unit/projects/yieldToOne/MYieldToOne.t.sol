@@ -310,8 +310,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         _installContractKey();
 
         // bob has no registered key => empty-ciphertext fallback emit on the bytes overload.
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Approval(alice, bob, bytes(""));
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Approval(alice, bob, bytes32(0), bytes(""));
 
         vm.prank(alice);
         mYieldToOne.approve(bob, suint256(amount));
@@ -966,8 +966,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         _installContractKey();
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, bytes(""));
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, bytes32(0), bytes(""));
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(amount));
@@ -994,8 +994,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         _installContractKey();
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, alice, bytes(""));
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, alice, bytes32(0), bytes(""));
 
         vm.prank(alice);
         mYieldToOne.transfer(alice, suint256(amount));
@@ -1051,8 +1051,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(alice);
         mYieldToOne.approve(carol, suint256(allowanceAmount));
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, bytes(""));
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, bytes32(0), bytes(""));
 
         vm.prank(carol);
         mYieldToOne.transferFrom(alice, bob, suint256(amount));
@@ -1463,7 +1463,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
 
         bool foundBytes;
@@ -1483,7 +1483,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
             }
         }
 
-        assertTrue(foundBytes, "missing Transfer(address,address,bytes) emit");
+        assertTrue(foundBytes, "missing Transfer(address,address,bytes32,bytes) emit");
         assertFalse(foundPlaintext, "plaintext Transfer(uint256) emitted on shielded path");
 
         assertEq(mYieldToOne.getBalanceOf(alice), 0);
@@ -1513,7 +1513,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
 
         bool foundBytes;
@@ -1533,7 +1533,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
             }
         }
 
-        assertTrue(foundBytes, "missing Transfer(address,address,bytes) emit");
+        assertTrue(foundBytes, "missing Transfer(address,address,bytes32,bytes) emit");
         assertFalse(foundPlaintext, "plaintext Transfer(uint256) emitted on shielded path");
     }
 
@@ -1547,8 +1547,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(bob);
         mYieldToOne.registerPublicKey(_validPubKey(0xBB));
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(amount));
@@ -1605,8 +1605,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         vm.prank(bob);
         mYieldToOne.registerPublicKey(_validPubKey(0xBB));
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(0));
@@ -1624,8 +1624,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         _installContractKey();
 
         // Precompiles are intentionally not mocked: the fallback path must not call them.
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, bytes(""));
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, bytes32(0), bytes(""));
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(amount));
@@ -1642,8 +1642,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         _installContractKey();
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, bytes(""));
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, bytes32(0), bytes(""));
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(0));
@@ -1801,7 +1801,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Approval(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Approval(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Approval(address,address,uint256)");
 
         bool foundBytes;
@@ -1821,7 +1821,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
             }
         }
 
-        assertTrue(foundBytes, "missing Approval(address,address,bytes) emit");
+        assertTrue(foundBytes, "missing Approval(address,address,bytes32,bytes) emit");
         assertFalse(foundPlaintext, "plaintext Approval(uint256) emitted on shielded path");
 
         assertEq(mYieldToOne.getShieldedAllowance(alice, bob), amount);
@@ -1832,8 +1832,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         _installContractKey();
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Approval(alice, bob, bytes(""));
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Approval(alice, bob, bytes32(0), bytes(""));
 
         vm.prank(alice);
         mYieldToOne.approve(bob, suint256(amount));
@@ -1875,7 +1875,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Approval(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Approval(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Approval(address,address,uint256)");
 
         bool foundBytes;
@@ -1923,7 +1923,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
 
         bool foundBytes;
@@ -1969,7 +1969,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
 
         bool foundBytes;
@@ -2018,7 +2018,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
 
         bool foundBytes;
@@ -2078,8 +2078,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         uint256 nonceBefore = mYieldToOne.getEncryptedEventNonce();
 
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, bytes(""));
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, bytes32(0), bytes(""));
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(amount));
@@ -2149,7 +2149,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.transfer(bob, suint256(amount));
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Transfer(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Transfer(address,address,uint256)");
 
         assertTrue(bytesTopic != plaintextTopic, "bytes overload topic0 collides with uint256 overload");
@@ -2170,7 +2170,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
             }
         }
 
-        assertTrue(foundBytes, "missing Transfer(address,address,bytes) emit");
+        assertTrue(foundBytes, "missing Transfer(address,address,bytes32,bytes) emit");
         assertFalse(foundPlaintext, "plaintext Transfer(uint256) emitted on shielded path");
     }
 
@@ -2189,7 +2189,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.approve(bob, suint256(amount));
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 bytesTopic = keccak256("Approval(address,address,bytes)");
+        bytes32 bytesTopic = keccak256("Approval(address,address,bytes32,bytes)");
         bytes32 plaintextTopic = keccak256("Approval(address,address,uint256)");
 
         assertTrue(bytesTopic != plaintextTopic, "bytes overload topic0 collides with uint256 overload");
@@ -2210,7 +2210,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
             }
         }
 
-        assertTrue(foundBytes, "missing Approval(address,address,bytes) emit");
+        assertTrue(foundBytes, "missing Approval(address,address,bytes32,bytes) emit");
         assertFalse(foundPlaintext, "plaintext Approval(uint256) emitted on shielded path");
 
         assertEq(mYieldToOne.getShieldedAllowance(alice, bob), amount);
@@ -2261,8 +2261,8 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 nonceBefore = mYieldToOne.getEncryptedEventNonce();
 
         // Encrypted-bytes overload still fires (the encrypt pipeline runs before the zero-amount early return).
-        vm.expectEmit(true, true, false, true);
-        emit IMYieldToOne.Transfer(alice, bob, hex"deadbeefcafebabe");
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.Transfer(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
 
         vm.prank(carol);
         mYieldToOne.transferFrom(alice, bob, suint256(0));

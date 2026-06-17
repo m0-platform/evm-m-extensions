@@ -29,8 +29,8 @@ contract MYieldToOneSeismicIntegrationTests is BaseUnitTest {
     // 33 bytes, valid 0x02 prefix, x = 5 is not on secp256k1 (5^3 + 7 is a non-residue).
     bytes internal constant OFF_CURVE_KEY = hex"020000000000000000000000000000000000000000000000000000000000000005";
 
-    bytes32 internal constant TRANSFER_BYTES_TOPIC = keccak256("Transfer(address,address,bytes)");
-    bytes32 internal constant APPROVAL_BYTES_TOPIC = keccak256("Approval(address,address,bytes)");
+    bytes32 internal constant TRANSFER_BYTES_TOPIC = keccak256("Transfer(address,address,bytes32,bytes)");
+    bytes32 internal constant APPROVAL_BYTES_TOPIC = keccak256("Approval(address,address,bytes32,bytes)");
 
     MYieldToOneHarness public mYieldToOne;
 
