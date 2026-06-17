@@ -55,8 +55,24 @@ interface IMYieldToOne {
      * @param  encryptedAmount AES-GCM ciphertext of the allowance; empty bytes if `spender` has no registered key.
      */
     event Approval(
-        address indexed owner, address indexed spender, bytes32 indexed encryptKeyHash, bytes encryptedAmount
+        address indexed owner,
+        address indexed spender,
+        bytes32 indexed encryptKeyHash,
+        bytes encryptedAmount
     );
+
+    /**
+     * @notice Emitted with each encrypted `Transfer`/`Approval` whose counterparty has a registered key,
+     *         publishing the counter mixed into that ciphertext's AES-GCM nonce so off-chain decryptors
+     *         read the exact nonce directly instead of brute-force scanning the counter space.
+     * @dev    Bound to the same `(from, to)` hashed into `keccak256(from, to, nonce)`; emitted immediately
+     *         before its `Transfer`/`Approval`. Not emitted on the no-registered-key fallback (empty
+     *         ciphertext, no counter consumed) or on the plaintext infra paths.
+     * @param  from  The counterparty bound into the nonce — sender for transfers, owner for approvals.
+     * @param  to    The account whose registered key the amount is encrypted to (recipient / spender).
+     * @param  nonce The `encryptedEventNonce` counter mixed into this ciphertext's AES-GCM nonce.
+     */
+    event EncryptedAmountNonce(address indexed from, address indexed to, uint256 nonce);
 
     /**
      * @notice Emitted when the contract's encrypted-event keypair is installed; only the public key is logged.

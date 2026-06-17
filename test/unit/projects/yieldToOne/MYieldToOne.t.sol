@@ -1805,18 +1805,18 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.setBalanceOf(alice, amount);
 
         _installContractKey();
-        _mockPrecompiles();
 
         vm.prank(bob);
         mYieldToOne.registerPublicKey(_validPubKey(0xBB));
 
-        vm.expectEmit(true, true, true, true);
-        emit IMYieldToOne.Transfer(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
+        vm.recordLogs();
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(0));
 
-        assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
+        // Zero-amount transfer is a no-op: early return before any emit, counter increment, or balance change.
+        assertEq(vm.getRecordedLogs().length, 0);
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
         assertEq(mYieldToOne.getBalanceOf(alice), amount);
         assertEq(mYieldToOne.getBalanceOf(bob), 0);
     }
@@ -1847,12 +1847,13 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         _installContractKey();
 
-        vm.expectEmit(true, true, true, true);
-        emit IMYieldToOne.Transfer(alice, bob, bytes32(0), bytes(""));
+        vm.recordLogs();
 
         vm.prank(alice);
         mYieldToOne.transfer(bob, suint256(0));
 
+        // Zero-amount transfer is a no-op regardless of whether the recipient has registered a key.
+        assertEq(vm.getRecordedLogs().length, 0);
         assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
         assertEq(mYieldToOne.getBalanceOf(alice), amount);
         assertEq(mYieldToOne.getBalanceOf(bob), 0);
@@ -1983,6 +1984,66 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         mYieldToOne.transfer(bob, suint256(1_000e6));
 
         assertEq(mYieldToOne.getEncryptedEventNonce(), 3);
+    }
+
+    /* ============ EncryptedAmountNonce ============ */
+
+    function test_shieldedTransfer_registeredRecipient_emitsNonce() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.EncryptedAmountNonce(alice, bob, 1);
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
+    }
+
+    function test_shieldedApprove_registeredSpender_emitsNonce() external {
+        _installContractKey();
+        _mockPrecompiles();
+
+        vm.prank(bob);
+        mYieldToOne.registerPublicKey(_validPubKey(0xBB));
+
+        vm.expectEmit(true, true, true, true);
+        emit IMYieldToOne.EncryptedAmountNonce(alice, bob, 1);
+
+        vm.prank(alice);
+        mYieldToOne.approve(bob, suint256(1_000e6));
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 1);
+    }
+
+    function test_shieldedTransfer_unregisteredRecipient_noNonceEvent() external {
+        uint256 amount = 1_000e6;
+        mYieldToOne.setBalanceOf(alice, amount);
+
+        // Key set, but bob unregistered => empty-ciphertext fallback: no counter consumed, no nonce event.
+        _installContractKey();
+
+        vm.recordLogs();
+
+        vm.prank(alice);
+        mYieldToOne.transfer(bob, suint256(amount));
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 nonceTopic = keccak256("EncryptedAmountNonce(address,address,uint256)");
+
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(mYieldToOne) || logs[i].topics.length == 0) continue;
+            assertTrue(logs[i].topics[0] != nonceTopic, "EncryptedAmountNonce emitted on the no-key fallback");
+        }
+
+        assertEq(mYieldToOne.getEncryptedEventNonce(), 0);
     }
 
     /* ============ _shieldedApprove ============ */
@@ -2253,7 +2314,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
         uint256 amount,
         bool selfTransfer
     ) external {
-        amount = bound(amount, 0, type(uint240).max);
+        amount = bound(amount, 1, type(uint240).max);
 
         address recipient = selfTransfer ? alice : bob;
 
@@ -2274,7 +2335,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     }
 
     function testFuzz_shieldedTransfer_unregisteredRecipient_neverBurnsNonce(uint256 amount) external {
-        amount = bound(amount, 0, type(uint240).max);
+        amount = bound(amount, 1, type(uint240).max);
 
         mYieldToOne.setBalanceOf(alice, type(uint240).max);
 
@@ -2338,7 +2399,7 @@ contract MYieldToOneUnitTests is BaseUnitTest {
     }
 
     function testFuzz_shieldedTransfer_ciphertextMatchesPrecompileOutput(uint256 amount) external {
-        amount = bound(amount, 0, type(uint240).max);
+        amount = bound(amount, 1, type(uint240).max);
 
         mYieldToOne.setBalanceOf(alice, type(uint240).max);
 
@@ -2465,16 +2526,15 @@ contract MYieldToOneUnitTests is BaseUnitTest {
 
         uint256 nonceBefore = mYieldToOne.getEncryptedEventNonce();
 
-        // Encrypted-bytes overload still fires (the encrypt pipeline runs before the zero-amount early return).
-        vm.expectEmit(true, true, true, true);
-        emit IMYieldToOne.Transfer(alice, bob, keccak256(_validPubKey(0xBB)), hex"deadbeefcafebabe");
+        vm.recordLogs();
 
         vm.prank(carol);
         mYieldToOne.transferFrom(alice, bob, suint256(0));
 
-        // Allowance decremented by 0; a nonce is still burned; balances unchanged.
+        // Zero-amount transferFrom is a no-op: allowance decremented by 0, no emit/nonce, balances unchanged.
+        assertEq(vm.getRecordedLogs().length, 0);
         assertEq(mYieldToOne.getShieldedAllowance(alice, carol), allowanceAmount);
-        assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore + 1);
+        assertEq(mYieldToOne.getEncryptedEventNonce(), nonceBefore);
         assertEq(mYieldToOne.getBalanceOf(alice), 1_000e6);
         assertEq(mYieldToOne.getBalanceOf(bob), 0);
     }

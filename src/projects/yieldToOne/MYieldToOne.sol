@@ -581,6 +581,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
     function _shieldedTransfer(address sender, address recipient, suint256 amount, bool encryptEmit) internal {
         uint256 amount_ = uint256(amount);
 
+        if (amount_ == 0) return;
+
         _revertIfInvalidRecipient(recipient);
         _beforeTransfer(sender, recipient, amount_);
 
@@ -590,8 +592,6 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         } else {
             emit Transfer(sender, recipient, amount_);
         }
-
-        if (amount_ == 0) return;
 
         // NOTE: Branching on a shielded value leaks a 1-bit comparison via revert-vs-success;
         //       accepted — inherent to ERC20 insufficient-balance semantics (ssolc 10311).
@@ -627,6 +627,8 @@ contract MYieldToOne is IMYieldToOne, MYieldToOneStorageLayout, MExtension, Free
         encryptKeyHash = keccak256(pubKey);
 
         uint256 n = ++$.encryptedEventNonce;
+
+        emit EncryptedAmountNonce(from, to, n);
 
         sbytes32 sharedSecret = _ecdh($.contractPrivateKey, pubKey);
         sbytes32 aesKey = _hkdf(sharedSecret);

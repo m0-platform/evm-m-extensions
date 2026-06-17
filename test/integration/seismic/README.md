@@ -78,5 +78,7 @@ suite and `script/decrypt-transfer-event.py --self-test` both assert these vecto
 
 Event key = `0x68(0x65(contractPriv, recipientPub))` — a double HKDF.
 Event nonce = first 12 bytes of `keccak256(abi.encode(from, to, nonceCounter))`,
-`nonceCounter` pre-incremented per encrypted emit (1-based, shared across Transfer/Approval).
+`nonceCounter` pre-incremented per encrypted emit (1-based, shared across Transfer/Approval) and
+published on-chain via the `EncryptedAmountNonce(from, to, nonce)` event emitted alongside each
+encrypted Transfer/Approval — so a decryptor reads the exact counter instead of scanning for it.
 Plaintext = `abi.encode(uint256 amount)`.
