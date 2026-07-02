@@ -13,6 +13,7 @@ import { MYieldToOneForcedTransfer } from "../../../../src/projects/yieldToOne/M
 import { IMYieldToOne } from "../../../../src/projects/yieldToOne/interfaces/IMYieldToOne.sol";
 
 import { IForcedTransferable } from "../../../../src/components/forcedTransferable/IForcedTransferable.sol";
+import { IArrayErrors } from "../../../../src/interfaces/IArrayErrors.sol";
 import { IFreezable } from "../../../../src/components/freezable/IFreezable.sol";
 
 import { MYieldToOneForcedTransferHarness } from "../../../harness/MYieldToOneForcedTransferHarness.sol";
@@ -131,7 +132,7 @@ contract MYieldToOneForcedTransferUnitTest is BaseUnitTest {
         recipients[0] = carol;
 
         vm.prank(forcedTransferManager);
-        vm.expectRevert(IForcedTransferable.ArrayLengthMismatch.selector);
+        vm.expectRevert(IArrayErrors.ArrayLengthMismatch.selector);
         mYieldToOneForcedTransfer.forceTransfers(frozenAccounts, recipients, amounts);
     }
 

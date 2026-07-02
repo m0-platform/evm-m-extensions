@@ -7,6 +7,7 @@ import { IAccessControl } from "../../../../lib/common/lib/openzeppelin-contract
 import { Upgrades, UnsafeUpgrades } from "../../../../lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { IForcedTransferable } from "../../../../src/components/forcedTransferable/IForcedTransferable.sol";
+import { IArrayErrors } from "../../../../src/interfaces/IArrayErrors.sol";
 
 import { ForcedTransferableHarness } from "../../../harness/ForcedTransferableHarness.sol";
 
@@ -96,7 +97,7 @@ contract ForcedTransferableUnitTests is BaseUnitTest {
         amounts[1] = 20;
 
         vm.prank(forcedTransferManager);
-        vm.expectRevert(IForcedTransferable.ArrayLengthMismatch.selector);
+        vm.expectRevert(IArrayErrors.ArrayLengthMismatch.selector);
         forcedTransfer.forceTransfers(froms, tos, amounts);
     }
 }

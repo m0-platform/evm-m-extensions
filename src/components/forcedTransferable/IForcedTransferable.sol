@@ -2,7 +2,9 @@
 
 pragma solidity ^0.8.26;
 
-interface IForcedTransferable {
+import { IArrayErrors } from "../../interfaces/IArrayErrors.sol";
+
+interface IForcedTransferable is IArrayErrors {
     /* ============ Events ============ */
 
     /**
@@ -19,9 +21,6 @@ interface IForcedTransferable {
 
     /// @notice Error for zero forced transfer manager address
     error ZeroForcedTransferManager();
-
-    /// @notice Error for array length mismatch
-    error ArrayLengthMismatch();
 
     /* ============ Interactive Functions ============ */
     /**

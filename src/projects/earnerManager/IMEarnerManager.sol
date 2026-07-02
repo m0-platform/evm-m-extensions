@@ -2,11 +2,13 @@
 
 pragma solidity 0.8.26;
 
+import { IArrayErrors } from "../../interfaces/IArrayErrors.sol";
+
 /**
  * @title M Extension where Earner Manager whitelists earners and sets fee rates for them.
  * @author M0 Labs
  */
-interface IMEarnerManager {
+interface IMEarnerManager is IArrayErrors {
     /* ============ Events ============ */
 
     /**
@@ -60,9 +62,6 @@ interface IMEarnerManager {
 
     /// @notice Emitted if the account is not whitelisted.
     error NotWhitelisted(address account);
-
-    /// @notice Emitted in `setAccountInfo` if lengths of arrays mismatch.
-    error ArrayLengthMismatch();
 
     /// @notice Emitted in `setAccountInfo` if the array is empty.
     error ArrayLengthZero();

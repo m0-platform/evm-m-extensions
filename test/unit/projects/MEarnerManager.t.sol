@@ -9,6 +9,7 @@ import { Upgrades, UnsafeUpgrades } from "../../../lib/openzeppelin-foundry-upgr
 
 import { IMExtension } from "../../../src/interfaces/IMExtension.sol";
 import { IMEarnerManager } from "../../../src/projects/earnerManager/IMEarnerManager.sol";
+import { IArrayErrors } from "../../../src/interfaces/IArrayErrors.sol";
 import { ISwapFacility } from "../../../src/swap/interfaces/ISwapFacility.sol";
 
 import { IPausable } from "../../../src/components/pausable/IPausable.sol";
@@ -330,17 +331,17 @@ contract MEarnerManagerUnitTests is BaseUnitTest {
     }
 
     function test_setAccountInfo_batch_arrayLengthMismatch() external {
-        vm.expectRevert(IMEarnerManager.ArrayLengthMismatch.selector);
+        vm.expectRevert(IArrayErrors.ArrayLengthMismatch.selector);
 
         vm.prank(earnerManager);
         mEarnerManager.setAccountInfo(new address[](1), new bool[](2), new uint16[](2));
 
-        vm.expectRevert(IMEarnerManager.ArrayLengthMismatch.selector);
+        vm.expectRevert(IArrayErrors.ArrayLengthMismatch.selector);
 
         vm.prank(earnerManager);
         mEarnerManager.setAccountInfo(new address[](2), new bool[](1), new uint16[](2));
 
-        vm.expectRevert(IMEarnerManager.ArrayLengthMismatch.selector);
+        vm.expectRevert(IArrayErrors.ArrayLengthMismatch.selector);
 
         vm.prank(earnerManager);
         mEarnerManager.setAccountInfo(new address[](2), new bool[](2), new uint16[](1));
