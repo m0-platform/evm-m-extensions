@@ -60,8 +60,11 @@ clean:
 #
 #
 
+# EXTENSION_NAME is an ERC-20 token name and may contain spaces (e.g. "Dual
+# Class USD"), so it is quoted wherever it is passed on a recipe command line —
+# an unquoted $(EXTENSION_NAME) word-splits and breaks the deploy.
 deploy-yield-to-one:
-	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) EXTENSION_NAME=$(EXTENSION_NAME) \
+	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) EXTENSION_NAME="$(EXTENSION_NAME)" \
 	forge script script/deploy/DeployYieldToOne.s.sol:DeployYieldToOne \
 	--rpc-url $(RPC_URL) \
 	--private-key $(PRIVATE_KEY) \
@@ -71,7 +74,7 @@ deploy-yield-to-one-sepolia: RPC_URL=$(SEPOLIA_RPC_URL)
 deploy-yield-to-one-sepolia: deploy-yield-to-one
 
 deploy-yield-to-one-forced-transfer:
-	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) EXTENSION_NAME=$(EXTENSION_NAME) \
+	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) EXTENSION_NAME="$(EXTENSION_NAME)" \
 	forge script script/deploy/DeployYieldToOneForcedTransfer.s.sol:DeployYieldToOneForcedTransfer \
 	--rpc-url $(RPC_URL) \
 	--private-key $(PRIVATE_KEY) \
@@ -97,7 +100,7 @@ deploy-yield-to-one-forced-transfer-sepolia: VERIFIER_URL=${SEPOLIA_VERIFIER_URL
 deploy-yield-to-one-forced-transfer-sepolia: deploy-yield-to-one-forced-transfer
 
 deploy-yield-to-all:
-	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) EXTENSION_NAME=$(EXTENSION_NAME) \
+	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) EXTENSION_NAME="$(EXTENSION_NAME)" \
 	forge script script/deploy/DeployYieldToAllWithFee.s.sol:DeployYieldToAllWithFee \
 	--rpc-url $(RPC_URL) \
 	--private-key $(PRIVATE_KEY) \
@@ -107,7 +110,7 @@ deploy-yield-to-all-sepolia: RPC_URL=$(SEPOLIA_RPC_URL)
 deploy-yield-to-all-sepolia: deploy-yield-to-all
 
 deploy-m-earner-manager:
-	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) EXTENSION_NAME=$(EXTENSION_NAME) \
+	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) EXTENSION_NAME="$(EXTENSION_NAME)" \
 	forge script script/deploy/DeployMEarnerManager.s.sol:DeployMEarnerManager \
 	--private-key $(PRIVATE_KEY) \
 	--rpc-url $(RPC_URL) \
@@ -117,7 +120,7 @@ deploy-m-earner-manager-sepolia: RPC_URL=$(SEPOLIA_RPC_URL)
 deploy-m-earner-manager-sepolia: deploy-m-earner-manager
 
 deploy-jmi-extension:
-	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) EXTENSION_NAME=$(EXTENSION_NAME) \
+	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) EXTENSION_NAME="$(EXTENSION_NAME)" \
 	forge script script/deploy/DeployJMIExtension.s.sol:DeployJMIExtension \
 	--rpc-url $(RPC_URL) \
 	--private-key $(PRIVATE_KEY) \
