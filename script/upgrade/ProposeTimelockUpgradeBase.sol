@@ -116,26 +116,6 @@ contract ProposeTimelockUpgradeBase is TimelockBatchBase, Config {
         console.log("================================================================================");
     }
 
-    /// @notice Executes a previously scheduled timelock batch after the delay has elapsed.
-    /// @param  timelock_ The address of the TimelockController.
-    /// @param  predecessor_  The predecessor operation id, or bytes32(0) if none.
-    /// @param  salt_     The salt used when scheduling the timelock operation.
-    function _executeTimelockBatch(address timelock_, bytes32 predecessor_, bytes32 salt_) internal {
-        TimelockController timelock = TimelockController(payable(timelock_));
-
-        bytes32 id = timelock.hashOperationBatch(
-            _timelockTargets,
-            _timelockValues,
-            _timelockPayloads,
-            predecessor_,
-            salt_
-        );
-
-        require(timelock.isOperationReady(id), "ProposeTimelockUpgradeBase: operation not ready");
-
-        timelock.executeBatch(_timelockTargets, _timelockValues, _timelockPayloads, predecessor_, salt_);
-    }
-
     /// @dev Duplicated from ScriptBase to avoid diamond inheritance with TimelockBatchBase
     function _deployOutputPath(uint256 chainId_) internal view returns (string memory) {
         return string.concat(vm.projectRoot(), "/deployments/", vm.toString(chainId_), ".json");
