@@ -435,3 +435,6 @@ uniswapv3/v3-periphery/libraries/PoolAddress.sol:evm-32-byte-hex:8
 uniswapv3/v3-periphery/utils/base64.sol:bare-32-byte-hex:11
 uniswapv3/v3-periphery/utils/base64.sol:bare-32-byte-hex:12
 uniswapv3/v3-periphery/utils/base64.sol:bare-32-byte-hex:13
+test/integration/seismic/run-sanvil-e2e.sh:evm-32-byte-hex:22
+test/integration/seismic/run-sanvil-e2e.sh:generic-api-key:23
+test/integration/seismic/run-sanvil-e2e.sh:evm-32-byte-hex:24
