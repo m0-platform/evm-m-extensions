@@ -340,7 +340,7 @@ contract JMIExtensionUnitTests is BaseUnitTest {
         vm.prank(assetCapManager);
         jmi.setAssetCap(address(mockUSDC), amount);
 
-        vm.expectRevert(abi.encodeWithSelector(UIntMath.InvalidUInt240.selector, address(mockUSDC)));
+        vm.expectRevert(abi.encodeWithSelector(UIntMath.InvalidUInt240.selector));
 
         vm.prank(address(swapFacility));
         jmi.wrap(address(mockUSDC), alice, amount);

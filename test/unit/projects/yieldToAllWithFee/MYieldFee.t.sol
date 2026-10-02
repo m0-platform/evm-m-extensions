@@ -25,6 +25,10 @@ import { MYieldFeeHarness } from "../../../harness/MYieldFeeHarness.sol";
 import { BaseUnitTest } from "../../../utils/BaseUnitTest.sol";
 
 contract MYieldFeeUnitTests is BaseUnitTest {
+    /// @dev Each principal rounding (down on mint, up on burn and transfer) loses less than `index / EXP_SCALED_ONE`.
+    ///      The fuzz tests bound the index to `10 * EXP_SCALED_ONE` and round each account at most two times.
+    uint256 internal constant MAX_ROUNDING_DELTA = 20;
+
     MYieldFeeHarness public mYieldFee;
 
     function setUp() public override {
@@ -795,7 +799,9 @@ contract MYieldFeeUnitTests is BaseUnitTest {
         uint40 nextTimestamp,
         uint40 finalTimestamp
     ) external {
-        vm.assume(nextTimestamp > latestUpdateTimestamp);
+        latestUpdateTimestamp = uint40(bound(latestUpdateTimestamp, 0, type(uint40).max - 2));
+        nextTimestamp = uint40(bound(nextTimestamp, latestUpdateTimestamp + 1, type(uint40).max - 1));
+        finalTimestamp = uint40(bound(finalTimestamp, nextTimestamp + 1, type(uint40).max));
 
         feeRate = _setupYieldFeeRate(feeRate);
 
@@ -819,8 +825,6 @@ contract MYieldFeeUnitTests is BaseUnitTest {
             : latestIndex;
 
         assertEq(mYieldFee.currentIndex(), expectedIndex);
-
-        vm.assume(finalTimestamp > nextTimestamp);
 
         // Update yield fee rate and M earner rate
         feeRate = _setupYieldFeeRate(nextYieldFeeRate);
@@ -1422,9 +1426,9 @@ contract MYieldFeeUnitTests is BaseUnitTest {
         mToken.setBalanceOf(address(mYieldFee), balance + aliceYield + yieldFee);
 
         // May round down in favor of the protocol
-        assertApproxEqAbs(mYieldFee.balanceWithYieldOf(alice), mYieldFee.projectedTotalSupply(), 17);
+        assertApproxEqAbs(mYieldFee.balanceWithYieldOf(alice), mYieldFee.projectedTotalSupply(), MAX_ROUNDING_DELTA);
         assertEq(mYieldFee.totalAccruedYield(), aliceYield);
-        assertApproxEqAbs(mYieldFee.totalAccruedFee(), yieldFee, 17);
+        assertApproxEqAbs(mYieldFee.totalAccruedFee(), yieldFee, MAX_ROUNDING_DELTA);
     }
 
     /* ============ unwrap ============ */
@@ -1635,9 +1639,13 @@ contract MYieldFeeUnitTests is BaseUnitTest {
         // Simulate M token balance.
         mToken.setBalanceOf(address(mYieldFee), balance + aliceYield + yieldFee);
 
-        assertApproxEqAbs(mYieldFee.balanceWithYieldOf(address(swapFacility)), mYieldFee.projectedTotalSupply(), 15);
+        assertApproxEqAbs(
+            mYieldFee.balanceWithYieldOf(address(swapFacility)),
+            mYieldFee.projectedTotalSupply(),
+            MAX_ROUNDING_DELTA
+        );
         assertEq(mYieldFee.totalAccruedYield(), aliceYield);
-        assertApproxEqAbs(mYieldFee.totalAccruedFee(), yieldFee, 15);
+        assertApproxEqAbs(mYieldFee.totalAccruedFee(), yieldFee, MAX_ROUNDING_DELTA);
 
         // M tokens are sent to SwapFacility and then forwarded to Alice
         assertEq(mToken.balanceOf(address(swapFacility)), unwrapAmount);
@@ -1881,10 +1889,10 @@ contract MYieldFeeUnitTests is BaseUnitTest {
         assertApproxEqAbs(
             mYieldFee.projectedTotalSupply(),
             mYieldFee.balanceWithYieldOf(alice) + mYieldFee.balanceWithYieldOf(bob),
-            16
+            MAX_ROUNDING_DELTA
         );
 
-        assertApproxEqAbs(mYieldFee.totalAccruedFee(), yieldFee, 16);
+        assertApproxEqAbs(mYieldFee.totalAccruedFee(), yieldFee, MAX_ROUNDING_DELTA);
     }
 
     /* ============ currentIndex Utils ============ */
