@@ -310,7 +310,7 @@ contract MExtensionUnitTests is BaseUnitTest {
     function test_upgrade_onlyAdmin() external {
         address v2implementation = address(new MExtensionUpgrade());
 
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice, admin));
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
 
         vm.prank(alice);
         proxyAdmin.upgradeAndCall(address(mExtension), v2implementation, "");
