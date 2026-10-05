@@ -207,6 +207,8 @@ contract MSpokeYieldFeeUnitTests is BaseUnitTest {
 
         vm.warp(finalTimestamp);
 
+        mToken.setLatestUpdateTimestamp(finalTimestamp);
+
         // expectedIndex was saved as the latest index and nextTimestamp is the latest saved timestamp
         expectedIndex = isEarningEnabled ? _getCurrentIndex(expectedIndex, latestRate, nextTimestamp) : latestIndex;
         assertEq(mYieldFee.currentIndex(), expectedIndex);
