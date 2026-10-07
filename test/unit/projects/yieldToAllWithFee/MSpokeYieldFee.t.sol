@@ -162,7 +162,9 @@ contract MSpokeYieldFeeUnitTests is BaseUnitTest {
         uint40 nextTimestamp,
         uint40 finalTimestamp
     ) external {
-        vm.assume(nextTimestamp > latestUpdateTimestamp);
+        latestUpdateTimestamp = uint40(bound(latestUpdateTimestamp, 0, type(uint40).max - 2));
+        nextTimestamp = uint40(bound(nextTimestamp, latestUpdateTimestamp + 1, type(uint40).max - 1));
+        finalTimestamp = uint40(bound(finalTimestamp, nextTimestamp + 1, type(uint40).max));
 
         feeRate = _setupYieldFeeRate(feeRate);
 
@@ -191,8 +193,6 @@ contract MSpokeYieldFeeUnitTests is BaseUnitTest {
 
         assertEq(mYieldFee.currentIndex(), expectedIndex);
 
-        vm.assume(finalTimestamp > nextTimestamp);
-
         // Update yield fee rate and M earner rate
         feeRate = _setupYieldFeeRate(nextYieldFeeRate);
 
@@ -206,6 +206,8 @@ contract MSpokeYieldFeeUnitTests is BaseUnitTest {
         latestRate = _setupLatestRate(latestRate);
 
         vm.warp(finalTimestamp);
+
+        mToken.setLatestUpdateTimestamp(finalTimestamp);
 
         // expectedIndex was saved as the latest index and nextTimestamp is the latest saved timestamp
         expectedIndex = isEarningEnabled ? _getCurrentIndex(expectedIndex, latestRate, nextTimestamp) : latestIndex;
