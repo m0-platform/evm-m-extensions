@@ -4,7 +4,8 @@ gas_reports = ["*"]
 gas_reports_ignore = []
 ignored_error_codes = []
 optimizer = true
-optimizer_runs = 19999
+# 19500 and higher puts MSpokeYieldFee over the EIP-170 size limit
+optimizer_runs = 19499
 solc_version = "0.8.26"
 verbosity = 3
 # Used to deploy transparent proxies
