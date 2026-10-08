@@ -1,8 +1,8 @@
 {
   "lib/common": {
     "tag": {
-      "name": "v1.6.0",
-      "rev": "3d82be9440793f2cec52f86f65c91a6a6974dd8a"
+      "name": "v1.8.0",
+      "rev": "b1bcdceb2519d436ce1d8d12df64a9c0577f2f09"
     }
   },
   "lib/forge-std": {

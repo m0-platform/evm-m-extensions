@@ -1404,10 +1404,12 @@ contract MYieldFeeUnitTests is BaseUnitTest {
 
         // When wrapping, added principal for account is always rounded down in favor of the protocol.
         // So in our test we need to round down too to accurately calculate balanceWithYield.
-        balanceWithYield = IndexingMath.getPresentAmountRoundedDown(
-            IndexingMath.getPrincipalAmountRoundedDown(balanceWithYield, currentIndex) +
-                IndexingMath.getPrincipalAmountRoundedDown(wrapAmount, currentIndex),
-            currentIndex
+        balanceWithYield = uint240(
+            IndexingMath.getPresentAmountRoundedDown(
+                IndexingMath.getPrincipalAmountRoundedDown(balanceWithYield, currentIndex) +
+                    IndexingMath.getPrincipalAmountRoundedDown(wrapAmount, currentIndex),
+                currentIndex
+            )
         );
 
         uint256 aliceYield = balanceWithYield <= balance ? 0 : balanceWithYield - balance;
@@ -1612,13 +1614,15 @@ contract MYieldFeeUnitTests is BaseUnitTest {
 
         // When unwrapping, subtracted principal for account is always rounded up in favor of the protocol.
         // So in our test we need to round up too to accurately calculate balanceWithYield.
-        balanceWithYield = IndexingMath.getPresentAmountRoundedDown(
-            balanceWithYieldPrincipal -
-                UIntMath.min112(
-                    IndexingMath.getPrincipalAmountRoundedUp(unwrapAmount, currentIndex),
-                    balanceWithYieldPrincipal
-                ),
-            currentIndex
+        balanceWithYield = uint240(
+            IndexingMath.getPresentAmountRoundedDown(
+                balanceWithYieldPrincipal -
+                    UIntMath.min112(
+                        IndexingMath.getPrincipalAmountRoundedUp(unwrapAmount, currentIndex),
+                        balanceWithYieldPrincipal
+                    ),
+                currentIndex
+            )
         );
 
         uint256 aliceYield = (balanceWithYield <= balance) ? 0 : balanceWithYield - balance;
@@ -1854,7 +1858,9 @@ contract MYieldFeeUnitTests is BaseUnitTest {
 
         // When subtracting, subtracted principal for account is always rounded up in favor of the protocol.
         // So in our test we need to round up too to accurately calculate aliceBalanceWithYield.
-        aliceBalanceWithYield = IndexingMath.getPresentAmountRoundedDown(aliceBalanceWithYieldPrincipal, currentIndex);
+        aliceBalanceWithYield = uint240(
+            IndexingMath.getPresentAmountRoundedDown(aliceBalanceWithYieldPrincipal, currentIndex)
+        );
 
         uint112 bobBalanceWithYieldPrincipal = IndexingMath.getPrincipalAmountRoundedDown(
             bobBalanceWithYield,
@@ -1863,7 +1869,9 @@ contract MYieldFeeUnitTests is BaseUnitTest {
 
         // When adding, added principal for account is always rounded down in favor of the protocol.
         // So in our test we need to round down too to accurately calculate bobBalanceWithYield.
-        bobBalanceWithYield = IndexingMath.getPresentAmountRoundedDown(bobBalanceWithYieldPrincipal, currentIndex);
+        bobBalanceWithYield = uint240(
+            IndexingMath.getPresentAmountRoundedDown(bobBalanceWithYieldPrincipal, currentIndex)
+        );
 
         uint240 aliceYield = aliceBalanceWithYield <= aliceBalance ? 0 : aliceBalanceWithYield - aliceBalance;
         uint240 bobYield = bobBalanceWithYield <= bobBalance ? 0 : bobBalanceWithYield - bobBalance;

@@ -1366,13 +1366,13 @@ contract MExtensionSystemIntegrationTests is BaseIntegrationTest {
     function _calcMPresentAmountRoundedDown(uint112 amount) public view returns (uint240) {
         uint128 _index = _currentMIndex();
 
-        return IndexingMath.getPresentAmountRoundedDown(amount, _index);
+        return uint240(IndexingMath.getPresentAmountRoundedDown(amount, _index));
     }
 
     function _calcMYieldFeePresentAmountRoundedDown(uint112 amount) public view returns (uint240) {
         uint128 _index = _currentMYieldFeeIndex();
 
-        return IndexingMath.getPresentAmountRoundedDown(amount, _index);
+        return uint240(IndexingMath.getPresentAmountRoundedDown(amount, _index));
     }
 
     function _currentMIndex() public view returns (uint128) {

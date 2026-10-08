@@ -106,7 +106,7 @@ contract BaseUnitTest is Helpers, Test {
         uint112 principal,
         uint128 index
     ) internal pure returns (uint240 balanceWithYield_, uint240 yield_) {
-        balanceWithYield_ = IndexingMath.getPresentAmountRoundedDown(principal, index);
+        balanceWithYield_ = uint240(IndexingMath.getPresentAmountRoundedDown(principal, index));
         yield_ = (balanceWithYield_ <= balance) ? 0 : balanceWithYield_ - balance;
     }
 

@@ -10,7 +10,9 @@ import { Upgrades } from "../../lib/openzeppelin-foundry-upgrades/src/Upgrades.s
 
 import { TimelockController } from "../../lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/governance/TimelockController.sol";
 
+import { Enum } from "../../lib/common/lib/safe-utils/lib/safe-smart-account/contracts/common/Enum.sol";
 import { Safe } from "../../lib/common/lib/safe-utils/src/Safe.sol";
+import { SafeNonce } from "../../lib/common/script/SafeNonce.sol";
 import { TimelockBatchBase } from "../../lib/common/script/TimelockBatchBase.sol";
 
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
@@ -107,8 +109,20 @@ contract ProposeTimelockUpgradeBase is TimelockBatchBase, Config {
         console.log("Proposing scheduleBatch to Safe...");
         _safeClient.initialize(safeMultisig);
 
+        // NOTE: Propose at the next free nonce. The on-chain nonce can be the same as the nonce of a pending proposal.
+        uint256 nonce = SafeNonce.next(_safeClient);
+        console.log("[nonce] proposing at nonce", nonce);
+
         vm.startBroadcast(proposer);
-        _safeClient.proposeTransaction(timelock, scheduleBatchData, proposer);
+        bytes memory signature = _safeClient.sign(
+            timelock,
+            scheduleBatchData,
+            Enum.Operation.Call,
+            proposer,
+            nonce,
+            ""
+        );
+        _safeClient.proposeTransactionWithSignature(timelock, scheduleBatchData, proposer, signature, nonce);
         vm.stopBroadcast();
 
         console.log("================================================================================");
