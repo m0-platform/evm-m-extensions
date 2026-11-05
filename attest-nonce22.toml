@@ -1,0 +1,26 @@
+producer_repo = "https://github.com/m0-platform/evm-m-extensions"
+producer_commit = "9e194fa9410edaaa467a324a55fa07af0e65f5a8"
+producer_setup = "git -c url.https://github.com/.insteadOf=git@github.com: submodule update --init --recursive --jobs 8"
+expected_forge_version = "1.8.1"
+
+[[run]]
+script = "script/ProposeTransferSwapFacilityOwner.s.sol:ProposeTransferSwapFacilityOwner"
+capture = "safe-utils"
+rpc_env = "MAINNET_RPC_URL"
+fork_block = "23834855"
+
+[run.env]
+PRIVATE_KEY = "1"
+
+[[run.claim]]
+output_path = "captured/nonce22.json"
+input_format = "safe-service"
+input_profile = "safe-utils"
+safe_version = "1.3.0"
+chain_id = "1"
+safe_network = "ethereum"
+safe_address = "0xdcf79C332cB3Fe9d39A830a5f8de7cE6b1BD6fD1"
+safe_nonce = "22"
+expected_output_sha256 = "d44813c544bb0fafe533b2a40807c54c8520f5d936542902e1bff2f314929977"
+expected_canonical_sha256 = "de3f0842aa8996e656b6c2e8ae669d27fc6deefb5d657225fb25bfd4efc900ae"
+expected_safe_tx_hash = "0xab7012df75fc7907ace6cb632bc3865ded2956c33fa2aab2d4b3d85167d485a6"
