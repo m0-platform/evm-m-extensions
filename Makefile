@@ -8,7 +8,7 @@ update:; forge update
 # Default to simulation. Broadcast only when BROADCAST is exactly "true".
 BROADCAST ?= false
 
-ifdef DRY_RUN
+ifneq ($(origin DRY_RUN),undefined)
 $(warning DRY_RUN is ignored. Use BROADCAST=true to broadcast.)
 endif
 
