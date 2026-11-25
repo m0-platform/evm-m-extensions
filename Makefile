@@ -5,16 +5,20 @@
 # dapp deps
 update:; forge update
 
-# Default to actual deployment (not simulation)
-DRY_RUN ?= false
+# Default to simulation. Broadcast only when BROADCAST is exactly "true".
+BROADCAST ?= false
+
+ifneq ($(origin DRY_RUN),undefined)
+$(warning DRY_RUN is ignored. Use BROADCAST=true to broadcast.)
+endif
 
 # Conditionally set broadcast and verify flags
-ifeq ($(DRY_RUN),true)
-	BROADCAST_FLAGS =
-	BROADCAST_ONLY_FLAGS =
-else
+ifeq ($(BROADCAST),true)
 	BROADCAST_FLAGS = --broadcast --verify
 	BROADCAST_ONLY_FLAGS = --broadcast
+else
+	BROADCAST_FLAGS =
+	BROADCAST_ONLY_FLAGS =
 endif
 
 # Deployment helpers
