@@ -78,6 +78,9 @@ contract DeployBase is DeployHelpers, ScriptBase {
             _computeSalt(deployer, "SwapFacility")
         );
 
+        // Bump version to 2 so `initializeV2` cannot be called by anyone later.
+        SwapFacility(proxy).initializeV2(pauser);
+
         proxyAdmin = Upgrades.getAdminAddress(proxy);
     }
 
