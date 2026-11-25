@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.26;
 
-import { Locker } from "../../lib/uniswap-v4-periphery/src/libraries/Locker.sol";
+import { Locker } from "./libs/Locker.sol";
 
 import { AccessControlUpgradeable } from "../../lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
